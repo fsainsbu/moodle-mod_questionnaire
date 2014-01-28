@@ -29,15 +29,7 @@
  * @package questiontypes
  */
 
-/** 
-*  Modified by Frank Sainsbury
-*
-*  Added linkage to a database to allow tabulated entries
-*  desinged in mod/data to be used in questionnaire
-*/
-
-
- /// Constants
+ // Constants.
 define('QUESCHOOSE', 0);
 define('QUESYESNO', 1);
 define('QUESTEXT', 2);
@@ -52,126 +44,125 @@ define('QUESDATA', 12);
 define('QUESPAGEBREAK', 99);
 define('QUESSECTIONTEXT', 100);
 
-GLOBAL $QTYPENAMES;
-$QTYPENAMES = array(
+GLOBAL $qtypenames;
+$qtypenames = array(
         QUESYESNO =>        'yesno',
         QUESTEXT =>         'text',
         QUESESSAY    =>     'essay',
         QUESRADIO =>        'radio',
         QUESCHECK =>        'check',
         QUESDROP =>         'drop',
+        QUESDATA =>         'dbase',
         QUESRATE =>         'rate',
         QUESDATE =>         'date',
         QUESNUMERIC =>      'numeric',
-        QUESDATA =>   	    'dbase',
         QUESPAGEBREAK =>    'pagebreak',
         QUESSECTIONTEXT =>  'sectiontext'
         );
-GLOBAL $idcounter;
+GLOBAL $idcounter, $CFG;
 $idcounter = 0;
 
 require_once($CFG->dirroot.'/mod/questionnaire/locallib.php');
 
 class questionnaire_question {
 
-/// Class Properties
-    /**
+    // Class Properties.
+    /*
      * The database id of this question.
      * @var int $id
      */
-     var $id          = 0;
+     public $id          = 0;
 
     /**
      * The database id of the survey this question belongs to.
      * @var int $survey_id
      */
-     var $survey_id   = 0;
+     public $surveyid   = 0;
 
     /**
      * The name of this question.
      * @var string $name
      */
-     var $name        = '';
+     public $name        = '';
 
     /**
      * The alias of the number of this question.
      * @var string $numberalias
      */
-//     var $numberalias = '';
 
     /**
      * The name of the question type.
      * @var string $type
      */
-     var $type        = '';
+     public $type        = '';
 
     /**
      * Array holding any choices for this question.
      * @var array $choices
      */
-     var $choices     = array();
+     public $choices     = array();
 
     /**
      * The table name for responses.
      * @var string $response_table
      */
-     var $response_table = '';
+     public $responsetable = '';
 
     /**
      * The length field.
      * @var int $length
      */
-     var $length      = 0;
+     public $length      = 0;
 
     /**
      * The precision field.
      * @var int $precise
      */
-     var $precise     = 0;
+     public $precise     = 0;
 
     /**
      * Position in the questionnaire
      * @var int $position
      */
-     var $position    = 0;
+     public $position    = 0;
 
     /**
      * The question's content.
      * @var string $content
      */
-     var $content     = '';
+     public $content     = '';
 
     /**
      * The list of all question's choices.
      * @var string $allchoices
      */
-     var $allchoices  = '';
+     public $allchoices  = '';
 
     /**
      * The required flag.
      * @var boolean $required
      */
-     var $required    = 'n';
+     public $required    = 'n';
 
     /**
      * The deleted flag.
      * @var boolean $deleted
      */
-     var $deleted     = 'n';
+     public $deleted     = 'n';
 
-/// Class Methods
+    // Class Methods.
 
     /**
      * The class constructor
      *
      */
-    function __construct($id = 0, $question = null, $context = null) {
+    public function __construct($id = 0, $question = null, $context = null) {
         global $DB;
         static $qtypes = null;
 
         if (is_null($qtypes)) {
             $qtypes = $DB->get_records('questionnaire_question_type', array(), 'typeid',
-                                       'typeid,type,has_choices,response_table');
+                                       'typeid, type, has_choices, response_table');
         }
 
         if ($id) {
@@ -182,6 +173,9 @@ class questionnaire_question {
             $this->id = $question->id;
             $this->survey_id = $question->survey_id;
             $this->name = $question->name;
+            // Added for skip feature.
+            $this->dependquestion = $question->dependquestion;
+            $this->dependchoice = $question->dependchoice;
             $this->length = $question->length;
             $this->precise = $question->precise;
             $this->position = $question->position;
@@ -199,11 +193,11 @@ class questionnaire_question {
         $this->context = $context;
     }
 
-    function get_choices() {
+    private function get_choices() {
         global $DB;
 
         if ($choices = $DB->get_records('questionnaire_quest_choice', array('question_id' => $this->id), 'id ASC')) {
-            foreach ($choices as $choice) { 
+            foreach ($choices as $choice) {
                 $this->choices[$choice->id] = new stdClass();
                 $this->choices[$choice->id]->content = $choice->content;
                 $this->choices[$choice->id]->value = $choice->value;
@@ -213,11 +207,11 @@ class questionnaire_question {
         }
     }
 
-/// Storage Methods:
-/// The following methods are defined by the tables they use. Questions should call the
-/// appropriate function based on its table.
+    // Storage Methods.
+    // The following methods are defined by the tables they use. Questions should call the
+    // appropriate function based on its table.
 
-    function insert_response($rid) {
+    public function insert_response($rid) {
         $method = 'insert_'.$this->response_table;
         if (method_exists($this, $method)) {
             return $this->$method($rid);
@@ -226,10 +220,10 @@ class questionnaire_question {
         }
     }
 
-    function insert_response_bool($rid) {
+    private function insert_response_bool($rid) {
         global $DB;
         $val = optional_param('q'.$this->id, '', PARAM_ALPHANUMEXT);
-        if (!empty($val)) { // if "no answer" then choice is empty (CONTRIB-846)
+        if (!empty($val)) { // If "no answer" then choice is empty (CONTRIB-846).
             $record = new Object();
             $record->response_id = $rid;
             $record->question_id = $this->id;
@@ -240,15 +234,15 @@ class questionnaire_question {
         }
     }
 
-    function insert_response_text($rid) {
+    private function insert_response_text($rid) {
         global $DB;
         $val = optional_param('q'.$this->id, '', PARAM_CLEAN);
-        // only insert if non-empty content
-        if($this->type_id == 10) { // numeric
+        // Only insert if non-empty content.
+        if ($this->type_id == QUESNUMERIC) {
             $val = preg_replace("/[^0-9.\-]*(-?[0-9]*\.?[0-9]*).*/", '\1', $val);
         }
 
-        if(preg_match("/[^ \t\n]/",$val)) {
+        if (preg_match("/[^ \t\n]/", $val)) {
             $record = new Object();
             $record->response_id = $rid;
             $record->question_id = $this->id;
@@ -259,15 +253,15 @@ class questionnaire_question {
         }
     }
 
-    function insert_response_date($rid) {
+    private function insert_response_date($rid) {
         global $DB;
         $val = optional_param('q'.$this->id, '', PARAM_CLEAN);
         $checkdateresult = questionnaire_check_date($val);
         $thisdate = $val;
-        if (substr($checkdateresult,0,5) == 'wrong') {
+        if (substr($checkdateresult, 0, 5) == 'wrong') {
             return false;
         }
-        // now use ISO date formatting
+        // Now use ISO date formatting.
         $checkdateresult = questionnaire_check_date($thisdate, $insert=true);
         $record = new Object();
         $record->response_id = $rid;
@@ -276,17 +270,17 @@ class questionnaire_question {
         return $DB->insert_record('questionnaire_'.$this->response_table, $record);
     }
 
-    function insert_resp_single($rid) {
+    private function insert_resp_single($rid) {
         global $DB;
         $val = optional_param('q'.$this->id, null, PARAM_CLEAN);
-        if(!empty($val)) {
+        if (!empty($val)) {
             foreach ($this->choices as $cid => $choice) {
                 if (strpos($choice->content, '!other') === 0) {
                     $other = optional_param('q'.$this->id.'_'.$cid, null, PARAM_CLEAN);
                     if (!isset($other)) {
                         continue;
                     }
-                    if(preg_match("/[^ \t\n]/",$other)) {
+                    if (preg_match("/[^ \t\n]/", $other)) {
                         $record = new Object();
                         $record->response_id = $rid;
                         $record->question_id = $this->id;
@@ -299,13 +293,13 @@ class questionnaire_question {
                 }
             }
         }
-        if(preg_match("/other_q([0-9]+)/", (isset($val)?$val:''), $regs)) {
+        if (preg_match("/other_q([0-9]+)/", (isset($val)?$val:''), $regs)) {
             $cid=$regs[1];
             $other = optional_param('q'.$this->id.'_'.$cid, null, PARAM_CLEAN);
             if (!isset($other)) {
-                break; // out of the case
+                break; // Out of the case.
             }
-            if(preg_match("/[^ \t\n]/",$other)) {
+            if (preg_match("/[^ \t\n]/", $other)) {
                 $record = new object;
                 $record->response_id = $rid;
                 $record->question_id = $this->id;
@@ -319,15 +313,16 @@ class questionnaire_question {
         $record->response_id = $rid;
         $record->question_id = $this->id;
         $record->choice_id = isset($val) ? $val : 0;
-        if ($record->choice_id) {// if "no answer" then choice_id is empty (CONTRIB-846)
+        if ($record->choice_id) {// If "no answer" then choice_id is empty (CONTRIB-846).
             return $DB->insert_record('questionnaire_'.$this->response_table, $record);
         } else {
             return false;
         }
     }
 
-    function insert_resp_multiple($rid) {
+    private function insert_resp_multiple($rid) {
         global $DB;
+        $resid = '';
         $val = optional_param_array('q'.$this->id, null, PARAM_CLEAN);
         foreach ($this->choices as $cid => $choice) {
             if (strpos($choice->content, '!other') === 0) {
@@ -340,7 +335,7 @@ class questionnaire_question {
                 } else {
                     array_push($val, $cid);
                 }
-                if(preg_match("/[^ \t\n]/",$other)) {
+                if (preg_match("/[^ \t\n]/", $other)) {
                     $record = new Object();
                     $record->response_id = $rid;
                     $record->question_id = $this->id;
@@ -351,15 +346,16 @@ class questionnaire_question {
             }
         }
 
-        if(!isset($val) || count($val) < 1) {
+        if (!isset($val) || count($val) < 1) {
             return false;
         }
 
-        foreach($val as $cid) {
+        foreach ($val as $cid) {
             $cid = clean_param($cid, PARAM_CLEAN);
-            if ($cid != 0) { //do not save response if choice is empty
-                if(preg_match("/other_q[0-9]+/", $cid))
+            if ($cid != 0) { // Do not save response if choice is empty.
+                if (preg_match("/other_q[0-9]+/", $cid)) {
                     continue;
+                }
                 $record = new Object();
                 $record->response_id = $rid;
                 $record->question_id = $this->id;
@@ -370,17 +366,17 @@ class questionnaire_question {
         return $resid;
     }
 
-    function insert_response_rank($rid) {
+    private function insert_response_rank($rid) {
         global $DB;
         $val = optional_param('q'.$this->id, null, PARAM_CLEAN);
-        if($this->type_id == 8) { // Rank
+        if ($this->type_id == QUESRATE) {
             $resid = false;
             foreach ($this->choices as $cid => $choice) {
                 $other = optional_param('q'.$this->id.'_'.$cid, null, PARAM_CLEAN);
                 if (!isset($other)) {
                     continue;
                 }
-                if($other == get_string('notapplicable', 'questionnaire')) {
+                if ($other == get_string('notapplicable', 'questionnaire')) {
                     $rank = -1;
                 } else {
                     $rank = intval($other);
@@ -393,9 +389,9 @@ class questionnaire_question {
                 $resid = $DB->insert_record('questionnaire_'.$this->response_table, $record);
             }
             return $resid;
-        } else { // THIS SHOULD NEVER HAPPEN
+        } else { // THIS SHOULD NEVER HAPPEN.
             $r = $val;
-            if($val == get_string('notapplicable', 'questionnaire')) {
+            if ($val == get_string('notapplicable', 'questionnaire')) {
                 $rank = -1;
             } else {
                 $rank = intval($val);
@@ -408,111 +404,120 @@ class questionnaire_question {
         }
     }
 
-    function insert_resp_data($rid, $formdata) {
+    
+    private function insert_resp_data($rid) {
         global $DB;
         global $CFG;
         global $USER;
         global $course;
         global $SESSION;
-
 	$answer = array();
 	$mydata = array();
 	/* FPS  Multiple fields to be  inserted/ updated in the database for user .   
-	At this stage a record aught to exist for the question with id of user in it.
+	At this stage a record should exist for the question with id of user in it.
 	*/
 	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
                 $currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
-        } else  {
-         $questionnairegroups = groups_get_all_groups($course->id);
-        if (!empty($questionnairegroups)) {
-            $groupscount = count($questionnairegroups);
-            foreach ($questionnairegroups as $key) {
-                $firstgroupid = $key->id;
-                break;
-            }
-            $currentsessiongroupid =  $firstgroupid;
-
-        } else  $currentgroupid = - 1;
+        } else {
+ 	$currentgroupid = 1;
             $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
-        }
+	}
 
-	$sql = "select  c.id,c.type,c.name,c.description,c.param1 FROM {data_fields} c where dataid = $this->precise;";
-       	$results = $DB->get_records_sql($sql);
-	$recno=0;
-/* match key in name q140-4-1  and insert result n record i  array[4,i]= value*/
-       	foreach ($formdata as $mykey => $myresult) {
-	if((($myresult)|| is_numeric($myresult ) )&&   ereg("q", $mykey) ){
-		$answer = explode("-",$mykey );
-	/* New record in same question so write it */
-		if(! isset($myrecordid) )$myrecordid ='';
-		if ( $myrecordid != $answer[2] && ereg($this->id,$answer[0])  ) {
- 		$myrecordid = $answer[2];
-		$mydata = new object();
-    		$mydata->userid = $USER->id;
-    		$mydata->dataid = $this->precise ;
-    		$mydata->groupid = $currentsessiongroupid;
-    		$mydata->timecreated = $mydata->timemodified = time();
-  		/*   if (has_capability('mod/data:approve', $context)) {
-        		$mydata->approved = 1;
-    		} else {
-        		$mydata->approved = 0;
-    		}
-		*/
-      		$recordid = $DB->insert_record('data_records', $mydata);
-		// print_r($mydata);
-                $record = new Object();
-                $record->response_id = $rid;
-                $record->question_id = $this->id;
-                $record->choice_id = $recordid;
-                $resid = $DB->insert_record('questionnaire_'.$this->response_table, $record);
-		}
-	/* process the content of record in formdatat */
-		$mycatch= '';
-		$content = new object();
-		$content->fieldid =  $answer[1];      
-		$content->recordid = $recordid;
-                foreach ($results as $key => $result) {
-	/* matched the fieldid to formdata */
-		if($result->id  == $content->fieldid) {
-	/* the thing has options in a list checkbox, menu in data*/
-            if ($result->param1){
-			$myc=1;
-			foreach (explode("\n",$result->param1 ) as $myanswer) {
-			if (is_array($myresult)) { 
- 			if (in_array($myc,$myresult)) { 
-				if ($mycatch) $mycatch .= '##'.$myanswer; else  $mycatch = $myanswer;
-			}
-			} else if  ( $myc   == ($myresult + 1) && is_numeric($myresult ) )  $mycatch = $myanswer;
-			$myc++;
-			}
+/*   FPS reverse engineer the keys for the parameters and voila add to data data_records and data content */
+$results = $DB->get_records('data_fields', array('dataid'=>$this->precise) , '', 'name, id, type,description,param1');
+// need to check max of $this->length and -$i value
+for ($i = 1; $i < $this->length; $i++) {
+                $isfirst = true;
+foreach ($results as $nkey => $nresult) {
+         //print_r($nresult);
+  switch ($nresult->type) {
+            case 'menu' :
+		 $suf='s';
+                break;
+            case 'checkbox':
+		 $suf='c';
+                break;
+            case 'textarea':
+		 $suf='m';
+                break;
+            case 'text':
+		 $suf='t';
+                break;
+	}
+// $suf=mysuffix($nresult->type);
 
-			if  ($mycatch) $myresult=$mycatch;
-               		}
-               		
-		$content->content = clean_param($myresult, PARAM_NOTAGS);
-
-		if (!$content->content) print(" Data missing<br>  ");
-
-		if ($oldcontent = $DB->get_record('data_content', array('fieldid'=>$content->fieldid, 'recordid'=>$recordid))) {
-			$content->id = $oldcontent->id;
-			$DB->update_record('data_content', $content);
-       		} else {
-             		$DB->insert_record('data_content', $content);
-       		}
-		}
-		}
-		}
-		}
-        return $resid;
-    }
+/* match key in name qt140-4-1  and insert result n record i  array[4,i]= value*/
+        $val = optional_param('q'. $suf.$this->id.'-'. $nresult->id.'-'.$i, null, PARAM_CLEAN);
+         print_r($val);
+        print_r( ' q'. $suf.$this->id.'-'. $nresult->id.'-'.$i.' : ');
+ if (isset($val) && $val != '' ) {
+     if($isfirst) {
+                $isfirst = false;
 
 
+                $myrecord = new object();
+                $myrecord->userid = $USER->id;
+                $myrecord->dataid = $this->precise ;
+                $myrecord->groupid = $currentgroupid;
+                $myrecord->timecreated = $myrecord->timemodified = time();
+                /*   if (has_capability('mod/data:approve', $context)) {
+                        $myrecord->approved = 1;
+                } else {
+                        $myrecord->approved = 0;
+                }
+                */
+                $recordid = $DB->insert_record('data_records', $myrecord);
+                // print_r($myrecord);
+                $myresp = new Object();
+                $myresp->response_id = $rid;
+                $myresp->question_id = $this->id;
+                $myresp->choice_id = $recordid;
+                $resid = $DB->insert_record('questionnaire_'.$this->response_table, $myresp);
+                // should be 0 print_r($resid);
 
-/// Results Methods:
-/// The following methods are defined by the tables they use. Questions should call the
-/// appropriate function based on its table.
+                }
+                $content = new object();
+                $content->fieldid =   $nresult->id;
+                $content->recordid = $recordid;
+                $mycatch= '';
+                $myresult =  clean_param($val, PARAM_NOTAGS);
+     /* the thing has options in a list checkbox, menu in data*/
+            if ($nresult->param1){
+                        $myc=1;
+                        foreach (explode("\n",$nresult->param1 ) as $myanswer) {
+                        if (is_array($myresult)) {
+                        if (in_array($myc,$myresult)) {
+                                if ($mycatch) $mycatch .= '##'.$myanswer; else  $mycatch = $myanswer;
+                        }
+                        } else if  ( $myc   == ($myresult + 1) && is_numeric($myresult ) )  $mycatch = $myanswer;
+                        $myc++;
+                        }
 
-    function get_results($rids=false) {
+                        if  ($mycatch) $myresult=$mycatch;
+                        }
+
+                $content->content = clean_param($myresult, PARAM_NOTAGS);
+
+                if (!$content->content) {
+                       print(" Data missing<br>  ");
+                }
+
+                if ($oldcontent = $DB->get_record('data_content', array('fieldid'=>$content->fieldid, 'recordid'=>$recordid))) {
+                        $content->id = $oldcontent->id;
+                        $DB->update_record('data_content', $content);
+                } else {
+                        $DB->insert_record('data_content', $content);
+                }
+}
+}
+}
+return $resid;
+}
+    // Results Methods.
+    // The following methods are defined by the tables they use. Questions should call the
+    // appropriate function based on its table.
+
+    private function get_results($rids=false) {
 
         $method = 'get_'.$this->response_table.'_results';
         if (method_exists($this, $method)) {
@@ -522,7 +527,7 @@ class questionnaire_question {
         }
     }
 
-    function get_response_bool_results($rids=false) {
+    private function get_response_bool_results($rids=false) {
         global $DB;
         global $CFG;
 
@@ -543,7 +548,7 @@ class questionnaire_question {
         return $DB->get_records_sql($sql, array($this->id));
     }
 
-    function get_response_text_results($rids = false) {
+    private function get_response_text_results($rids = false) {
         global $DB;
 
         $ridstr = '';
@@ -555,14 +560,19 @@ class questionnaire_question {
         } else if (is_int($rids)) {
             $ridstr = ' AND response_id = '.$rids.' ';
         }
-        $sql = 'SELECT id, response '.
-               'FROM {questionnaire_'.$this->response_table.'} '.
-               'WHERE question_id= ? '.$ridstr;
-        return $DB->get_records_sql($sql, array($this->id));
+        $sql = 'SELECT T.id, T.response, R.submitted AS submitted, R.username, U.username AS username, U.id AS user, '.
+                'U.lastname, U.firstname, R.survey_id, R.id AS rid '.
+                'FROM {questionnaire_'.$this->response_table.'} T, '.
+                '{questionnaire_response} R, '.
+                '{user} U '.
+                'WHERE question_id='.$this->id.$ridstr.
+                ' AND T.response_id = R.id'.
+                ' AND U.id = ' . $DB->sql_cast_char2int('R.username') .
+                'ORDER BY U.lastname, U.firstname';
+        return $DB->get_records_sql($sql);
     }
 
-
-    function get_response_date_results($rids = false) {
+    private function get_response_date_results($rids = false) {
         global $DB;
 
         $ridstr = '';
@@ -579,67 +589,199 @@ class questionnaire_question {
                'FROM {questionnaire_'.$this->response_table.'} '.
                'WHERE question_id= ? '.$ridstr;
 
-      return $DB->get_records_sql($sql, array($this->id));
+        return $DB->get_records_sql($sql, array($this->id));
     }
 
     function get_response_data_results($rids=false) {
         global $CFG;
         global $DB;
         global $SESSION;
-        global $course;;
 
-//FPS engine here selects all group entries on this questionaire selects all group entries on this questionnaire
- 	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
-        	$currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
-	} else {
-	 $questionnairegroups = groups_get_all_groups($course->id);
-        if (!empty($questionnairegroups)) {
-            $groupscount = count($questionnairegroups);
-            foreach ($questionnairegroups as $key) {
-                $firstgroupid = $key->id;
-                break;
-            }
-	    $currentsessiongroupid =  $firstgroupid;
-
-	} else  $currentsessiongroupid = - 1;
-            $SESSION->questionnaire->currentsessiongroupid = $currentsessiongroupid;
-	}
-// if no rids thaen just select all for this question and group
-        $ridstr = 'INNER JOIN '.$CFG->prefix.'data D on D.id=R.dataid  where R.groupid='.$currentsessiongroupid.'  and D.id = '.$this->precise.' ';
-// These are the recordids of the elements chosen
+        $ridstr = '';
         if (is_array($rids)) {
-            $ridstr = '';
             foreach ($rids as $rid) {
-                $ridstr .= (empty($ridstr) ? ' AND R.id IN ('.$rid : ', '.$rid);
+                $ridstr .= (empty($ridstr) ? ' AND choice_id IN ('.$rid : ', '.$rid);
             }
             $ridstr .= ') ';
         } else if (is_int($rids)) {
-            $ridstr = ' AND  R.id = '.$rids.' ';
+            $ridstr = ' AND response_id = '.$rids.' ';
         }
+     // $currentgroupid = groups_get_activity_group($cm);
+     $currentgroupid = 1;
+//FPS engine here selects all group entries on this questionaire selects all group entries on this questionnaire
+	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
+        	$currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
+	} else {
+	    $currentgroupid =  1;
+            $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
+	}
+       $sql = 'SELECT id,  choice_id as response '.
+               'FROM {questionnaire_'.$this->response_table.'} '.
+               'WHERE question_id= ? '.$ridstr;
+        return $DB->get_records_sql($sql, array($this->id));
+}
 
-/* select group_concat(description) as response from ( select distinct  F.description  from ch_data_content C, ch_data_fields F ,  ch_data D where C.fieldid  = F.id and F.dataid = 2) as me ;
-*/
-//FPS setit here for save
-        // $ridstr = '';
-       $sql = ' SELECT   recordid as cid , group_concat(C.content)as response  from '.$CFG->prefix.'data_records R  INNER JOIN '.$CFG->prefix.'data_content C ON C.recordid = R.id  '.$ridstr.' group by   C.recordid ;';
 
-     // print_r($ridstr.'X<br>');
-	$rows = $DB->get_records_sql($sql);
+function display_resp_data_results($rids=false) {
+        global $CFG;
+        global $DB;
+        global $SESSION;
+
+        print_r('<table class="generaltable"> <thead> <tr>');
+        $sql = ' SELECT    D.description as description from {data_fields} D where D.dataid = '.$this->precise.' order by d.dataid;';
+        $rows = $DB->get_records_sql($sql);
+         foreach ($rows as $row) {
+                if(!empty($row->description)) {
+                         print_r('</td><td>'.$row->description);
+                }
+        }
+        print_r('</td></tr>');
+ //well pointer in ridstr point to records which point to content.
+         $sql = ' SELECT   C.id as cid , C.content as response,  C.recordid as recordid from {data_records} R ,{data_content} C ,{data_fields} D where C.recordid = R.id  and D.dataid = '.$this->precise.' and C.fieldid = D.id  '.$ridstr.' order by R.id,D.id;';
+//need to establish colum names on first pass and print them out followed by table with data       
+        $myrid=-1;	
+        //  print($sql);
+        $rows = $DB->get_records_sql($sql);
 	 foreach ($rows as $row) {
                 if(!empty($row->response)) {
+                    if($myrid != $row-> recordid) {
+                         print_r('</td></tr><tr> <td>'.$row->response.'</td>');
+                          $myrid = $row-> recordid;
+			} else {
+                         print_r('</td><td>'.$row->response);
+                        }
+
                     $this->text = $row->response;
                     $textidx = clean_text($this->text);
                     $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                     $this->userid[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                 }
             }
-               $prtotal = 1; // a guess
-               // $this->mkreslist(count($rids), $this->precise, $prtotal);
+        print_r('</table>');
+       //   Analysis of frequency of answer
+         // $this->mkreslist(count($rids), $this->precise, $prtotal);
+
+
+//the analysis of frequency done here is placeholder for hack above for graphing hasontable etc.
+         $this->mkreslistdata(count($rids), $this->precise, $prtotal);
 
         return $rows;
-    }
+	}
 
-    function get_response_single_results($rids=false) {
+private function dbase_survey_display($formdata='') { // Database 
+	global $CFG;
+        global $DB;
+        global $SESSION;
+        global $USER;
+	$myEntries = array();
+ 	$myHeader = array();
+
+	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
+                $currentgroupid = $SESSION->questionnaire->currentgroupid;
+	} else {
+	    $currentgroupid =  1;
+            $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
+	}
+        /*print_r($formdata);
+        print_r('here<br>'.$this->rid);
+        foreach ($formdata as $key => $result) {
+         print_r($key.'&nbsp');
+         print_r($result.' : ');
+        }
+         print_r('<br>');
+        print_r($formdata->{'qs66-5-1'});
+*/
+        /*		
+        //FPS need the database id to pull fieldnames for entries, using default rows.	
+        // formdata has saved values.
+        /* This pulls data from fields to create data entry table, need ids for return values*/
+        $sql = 'SELECT C.id, recordid as cid , R.dataid,C.content as response from {data_records} R  INNER JOIN {data_content} C ON C.recordid = R.id INNER JOIN {data} D on D.id=R.dataid  where  R.userid = '.$USER->id.';';
+        $rows = $DB->get_records_sql($sql);
+        //  print_r($rows);
+         $sql = "select  d.id,d.type,d.name,d.description,d.param1 FROM {data_fields} d where dataid = $this->precise order by d.id;";
+	//print_r($sql);
+         $results = $DB->get_records_sql($sql);
+	 for ($i = 1; $i <= $this->length; $i++) {
+         foreach ($results as $key => $result) {
+        // FPS reused to store checkbox tiles.
+ 		$object = array();
+		$myHeader[$i][] =  "<td>".$result->description ."</td>";
+        //		print_r($result);
+        /* $result->id is the field id ; */
+            switch ($result->type) {
+            case 'menu' :
+		$myMenu='';
+		 foreach (explode("\n",$result->param1 ) as $answer)
+        	{
+		 $object[]=$answer;
+		}
+		print $formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i};
+                $myMenu .= html_writer::select($object, 'qs'.$this->id.'-'.$result->id.'-'.$i, (isset($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i})?$i:''), array(''=>'choosedots'), array('id' => $this->type . $this->id));
+			$myEntries[$i][] = "<td>".$myMenu."</td>";
+                break;
+            case 'checkbox':
+		$myChecks='';
+		$id=1;
+		 foreach (explode("\n",$result->param1 ) as $answer)
+        	{
+if (isset( $formdata->{'qc'.$this->id.'-'.$result->id.'-'.$i})) {
+                $myChecks .= html_writer::checkbox('qc'.$this->id.'-'.$result->id.'-'.$i.'[]', $id, in_array($id, $formdata->{'qc'.$this->id.'-'.$result->id.'-'.$i}), format_text($answer, FORMAT_HTML)).'<br>';
+} else{
+                $myChecks .= html_writer::checkbox('qc'.$this->id.'-'.$result->id.'-'.$i.'[]', $id, $id, format_text($answer, FORMAT_HTML)).'<br>';
+}
+                //echo html_writer::checkbox('q'.$this->id.'[]', $id, in_array($id, $data->{'q'.$this->id}),
+                 //                          format_text($contents->text, FORMAT_HTML).$contents->image);
+		$id++;
+		}
+			$myEntries[$i][] = "<td>".$myChecks."</td>";
+                break;
+            case 'textarea':
+		$myEntries[$i][]= '<td><div class="qn-type"><textarea class="form-textarea" id="edit-qt'.$this->id.'-'.$i.'" name="qm'.$this->id.'-'.$result->id.'-'.$i.'" rows="5" cols="60" >'. (!empty($formdata->{'qm'.$this->id.'-'.$result->id.'-'.$i}) ? stripslashes($formdata->{'qm'.$this->id.'-'.$result->id.'-'.$i}) : '') .'</textarea></div></fieldset></td>';
+                break;
+            case 'text':
+                $other_text = '&nbsp;<input type="text" size="25" name="qt'.$this->id.'-'.$result->id.'-'.$i.'"  id="qt'.$this->id.'-'.$result->id.'-'.$i.'"';
+                $other_text .= ' value="'. (!empty($formdata->{'qt'.$this->id.'-'.$result->id.'-'.$i}) ? stripslashes($formdata->{'qt'.$this->id.'-'.$result->id.'-'.$i}) : '') .'"';
+                $other_text .= ' /><br />';
+		$myEntries[$i][]= '<td><div class="qn-type">'. $other_text.' </div></fieldset></td>';
+                break;
+		}
+
+                }
+               /*  WRONG   shows why the qs prefix, all would have same name q65-3-5 otherwise 
+		for ($i = 1; $i <= $this->length; $i++) {
+		foreach ($myEntries as $val) { 
+			print('<pre>'.$val.'</pre>' );
+                         print ' qs'.$this->id.'-'.$result->id.'-'.$i.'<br>';
+                }
+                }
+               */
+                }
+		echo '<table class="qnInnerTable" style="width:100%" cellpadding="10"  cellspacing="1"> <tr>';
+		foreach ($myHeader[1] as $val) { print $val;};
+		print("</tr><tr>");
+			 /*print_r($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i}); 
+			 print_r($formdata->{'qt'.$this->id.'-'.$result->id.'-'.$i}); 
+			 print_r($formdata->{'qc'.$this->id.'-'.$result->id.'-'.$i}); 
+			 print_r($formdata->{'qm'.$this->id.'-'.$result->id.'-'.$i}); 
+*/
+		for ($j = 1; $j <= $this->length; $j++) {
+		foreach ($myEntries[$j] as $myval) { 
+			 //print preg_replace('/XX/', $i, $val); 
+		       //foreach ($myval as $val) { 
+			 print  $myval; 
+		 //};
+		 };
+		print("</tr><tr>");
+//print_r($myEntries);
+		}
+
+ 	echo "<tr></table>";
+                //    unset($results[$key]);
+
+	}
+
+
+    private function get_response_single_results($rids=false) {
         global $CFG;
         global $DB;
 
@@ -652,7 +794,7 @@ class questionnaire_question {
         } else if (is_int($rids)) {
             $ridstr = ' AND response_id = '.$rids.' ';
         }
-        // JR added qc.id to preserve original choices ordering
+        // Added qc.id to preserve original choices ordering.
         $sql = 'SELECT rt.id, qc.id as cid, qc.content '.
                'FROM {questionnaire_quest_choice} qc, '.
                '{questionnaire_'.$this->response_table.'} rt '.
@@ -662,7 +804,7 @@ class questionnaire_question {
 
         $rows = $DB->get_records_sql($sql, array($this->id));
 
-        // handle 'other...'
+        // Handle 'other...'.
         $sql = 'SELECT rt.id, rt.response, qc.content '.
                'FROM {questionnaire_response_other} rt, '.
                     '{questionnaire_quest_choice} qc '.
@@ -682,11 +824,11 @@ class questionnaire_question {
         return $rows;
     }
 
-    function get_response_multiple_results($rids) {
-        return $this->get_response_single_results($rids); // JR both functions are equivalent
+    private function get_response_multiple_results($rids) {
+        return $this->get_response_single_results($rids); // Both functions are equivalent.
     }
 
-    function get_response_rank_results($rids=false) {
+    private function get_response_rank_results($rids=false) {
         global $CFG;
         global $DB;
 
@@ -700,20 +842,44 @@ class questionnaire_question {
             $ridstr = ' AND response_id = '.$rids.' ';
         }
 
-        if($this->type_id  == 8) { //Rank
-         // JR there can't be an !other field in rating questions ???
-            $select = 'question_id='.$this->id.' AND content NOT LIKE \'!other%\' ORDER BY id ASC'; //JR 4 NOV 2009 added ORDER
+        if ($this->type_id  == QUESRATE) {
+            // JR there can't be an !other field in rating questions ???
+            $rankvalue = array();
+            $select = 'question_id='.$this->id.' AND content NOT LIKE \'!other%\' ORDER BY id ASC';
             if ($rows = $DB->get_records_select('questionnaire_quest_choice', $select)) {
                 foreach ($rows as $row) {
                     $this->counts[$row->content] = new stdClass();
-                    $nbna = $DB->count_records('questionnaire_response_rank', array('question_id' => $this->id, 'choice_id' => $row->id, 'rank' => '-1'));
+                    $nbna = $DB->count_records('questionnaire_response_rank', array('question_id' => $this->id,
+                                    'choice_id' => $row->id, 'rank' => '-1'));
                     $this->counts[$row->content]->nbna = $nbna;
+                    // The $row->value may be null (i.e. empty) or have a 'NULL' value.
+                    if ($row->value !== null && $row->value !== 'NULL') {
+                        $rankvalue[] = $row->value;
+                    }
                 }
             }
 
             $isrestricted = ($this->length < count($this->choices)) && $this->precise == 2;
-            // usual case
+            // Usual case.
             if (!$isrestricted) {
+                if (!empty ($rankvalue)) {
+                    $sql = "SELECT r.id, c.content, r.rank, c.id AS choiceid
+                    FROM {$CFG->prefix}questionnaire_quest_choice c, {$CFG->prefix}questionnaire_{$this->response_table} r
+                    WHERE r.choice_id = c.id
+                    AND c.question_id = ".$this->id."
+                    AND r.rank >= 0{$ridstr}
+                    ORDER BY choiceid";
+                    $results = $DB->get_records_sql($sql);
+                    $value = array();
+                    foreach ($results as $result) {
+                        if (isset ($value[$result->choiceid])) {
+                            $value[$result->choiceid] += $rankvalue[$result->rank];
+                        } else {
+                            $value[$result->choiceid] = $rankvalue[$result->rank];
+                        }
+                    }
+                }
+
                 $sql = "SELECT c.id, c.content, a.average, a.num
                         FROM {questionnaire_quest_choice} c
                         INNER JOIN
@@ -722,13 +888,18 @@ class questionnaire_question {
                               WHERE c2.question_id = ? AND a2.question_id = ? AND a2.choice_id = c2.id AND a2.rank >= 0{$ridstr}
                               GROUP BY c2.id) a ON a.id = c.id";
                 $results = $DB->get_records_sql($sql, array($this->id, $this->id));
-                /// Reindex by 'content'. Can't do this from the query as it won't work with MS-SQL.
+                if (!empty ($rankvalue)) {
+                    foreach ($results as $key => $result) {
+                        $result->averagevalue = $value[$key] / $result->num;
+                    }
+                }
+                // Reindex by 'content'. Can't do this from the query as it won't work with MS-SQL.
                 foreach ($results as $key => $result) {
                     $results[$result->content] = $result;
                     unset($results[$key]);
                 }
                 return $results;
-            // case where scaleitems is less than possible choices
+                // Case where scaleitems is less than possible choices.
             } else {
                 $sql = "SELECT c.id, c.content, a.sum, a.num
                         FROM {questionnaire_quest_choice} c
@@ -738,7 +909,7 @@ class questionnaire_question {
                               WHERE c2.question_id = ? AND a2.question_id = ? AND a2.choice_id = c2.id AND a2.rank >= 0{$ridstr}
                               GROUP BY c2.id) a ON a.id = c.id";
                 $results = $DB->get_records_sql($sql, array($this->id, $this->id));
-                // formula to calculate the best ranking order
+                // Formula to calculate the best ranking order.
                 $nbresponses = count($rids);
                 foreach ($results as $key => $result) {
                     $result->average = ($result->sum + ($nbresponses - $result->num) * ($this->length + 1)) / $nbresponses;
@@ -756,19 +927,19 @@ class questionnaire_question {
         }
     }
 
-/// Display Methods
+    // Display Methods.
 
-    function display_results($rids=false, $guicross=false, $sort) {
+    public function display_results($rids=false,  $sort) {
         $method = 'display_'.$this->response_table.'_results';
         if (method_exists($this, $method)) {
-            $a = $this->$method($rids, $guicross, $sort);
+            $a = $this->$method($rids, $sort);
             return $a;
         } else {
             return false;
         }
     }
 
-    function display_response_bool_results($rids=false, $guicross=false) {
+    private function display_response_bool_results($rids=false) {
         if (empty($this->stryes)) {
             $this->stryes = get_string('yes');
             $this->strno = get_string('no');
@@ -792,40 +963,40 @@ class questionnaire_question {
                 }
                 $this->counts[$this->choice] = $count;
             }
-            $this->mkrespercent(count($rids), $this->precise, $prtotal, $guicross, $sort='');
+            $this->mkrespercent(count($rids), $this->precise, $prtotal, $sort='');
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function display_response_text_results($rids = false) {
+    private function display_response_text_results($rids = false) {
         if (is_array($rids)) {
             $prtotal = 1;
         } else if (is_int($rids)) {
             $prtotal = 0;
         }
         if ($rows = $this->get_response_text_results($rids)) {
-            /// Count identical answers (numeric questions only)
+            // Count identical answers (numeric questions only).
             foreach ($rows as $row) {
-                if(!empty($row->response)) {
+                if (!empty($row->response)) {
                     $this->text = $row->response;
                     $textidx = clean_text($this->text);
                     $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                     $this->userid[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                 }
             }
-            $isnumeric = $this->type_id == 10;
+            $isnumeric = $this->type_id == QUESNUMERIC;
             if ($isnumeric) {
                 $this->mkreslistnumeric(count($rids), $this->precise);
             } else {
-                $this->mkreslist(count($rids), $this->precise, $prtotal);
+                $this->mkreslisttext($rows);
             }
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function display_response_date_results($rids = false) {
+    private function display_response_date_results($rids = false) {
         if (is_array($rids)) {
             $prtotal = 1;
         } else if (is_int($rids)) {
@@ -833,22 +1004,22 @@ class questionnaire_question {
         }
         if ($rows = $this->get_response_date_results($rids)) {
             foreach ($rows as $row) {
-            /// Count identical answers (case insensitive)
+                // Count identical answers (case insensitive).
                 $this->text = $row->response;
-                if(!empty($this->text)) {
+                if (!empty($this->text)) {
                     $dateparts = preg_split('/-/', $this->text);
-                    $this->text = make_timestamp($dateparts[0], $dateparts[1], $dateparts[2]); // Unix timestamp 
+                    $this->text = make_timestamp($dateparts[0], $dateparts[1], $dateparts[2]); // Unix timestamp.
                     $textidx = clean_text($this->text);
                     $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                 }
             }
             $this->mkreslistdate(count($rids), $this->precise, $prtotal);
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function display_resp_single_results($rids=false, $guicross=false, $sort) {
+    private function display_resp_single_results($rids=false, $sort) {
         if (is_array($rids)) {
             $prtotal = 1;
         } else if (is_int($rids)) {
@@ -871,41 +1042,13 @@ class questionnaire_question {
                     $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
                 }
             }
-            $this->mkrespercent(count($rids), $this->precise, $prtotal, $guicross, $sort);
+            $this->mkrespercent(count($rids), $this->precise, $prtotal, $sort);
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function display_resp_data_results($rids=false, $guicross=false, $sort) {
-        if (is_array($rids)) {
-            $prtotal = 1;
-        } else if (is_int($rids)) {
-            $prtotal = 0;
-        }
-//FPS engine in get_response_data_results;
-        if ($rows = $this->get_response_data_results($rids)) {
-            foreach ($rows as $idx => $row) {
-                if (strpos($idx, 'other') === 0) {
-                    $answer = $row->response;
-                    $content = '' . clean_text($answer);
-                    $textidx = $content;
-                    $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
-                } else {
-                    $contents = choice_values($row->response);
-                    $this->choice = $contents->text.$contents->image;
-                    $textidx = $this->choice;
-                    $this->counts[$textidx] = !empty($this->counts[$textidx]) ? ($this->counts[$textidx] + 1) : 1;
-                }
-            }
-
-            $this->mkrespercent(count($rids), $this->precise, 0, $guicross, $sort);
-        } else {
-            print_string('noresponsedata', 'questionnaire');
-        }
-    }
-
-    function display_resp_multiple_results($rids=false, $guicross=false, $sort) {
+    private function display_resp_multiple_results($rids=false, $sort) {
         if (is_array($rids)) {
             $prtotal = 1;
         } else if (is_int($rids)) {
@@ -929,13 +1072,13 @@ class questionnaire_question {
                 }
             }
 
-            $this->mkrespercent(count($rids), $this->precise, 0, $guicross, $sort);
+            $this->mkrespercent(count($rids), $this->precise, 0, $sort);
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function display_response_rank_results($rids=false, $guicross=false, $sort) {
+    private function display_response_rank_results($rids=false, $sort) {
         if (is_array($rids)) {
             $prtotal = 1;
         } else if (is_int($rids)) {
@@ -943,82 +1086,148 @@ class questionnaire_question {
         }
 
         if ($rows = $this->get_response_rank_results($rids, $sort)) {
-            if($this->type_id == 8) { //Rank
-                foreach ($this->counts as $key => $value) {
-                    $ccontent = $key;
-                    if (array_key_exists($ccontent, $rows)) {
-                        $avg = $rows[$ccontent]->average;
-                        $this->counts[$ccontent]->num = $rows[$ccontent]->num;
+            $stravgvalue = ''; // For printing table heading.
+            foreach ($this->counts as $key => $value) {
+                $ccontent = $key;
+                $avgvalue = '';
+                if (array_key_exists($ccontent, $rows)) {
+                    $avg = $rows[$ccontent]->average;
+                    $this->counts[$ccontent]->num = $rows[$ccontent]->num;
+                    if (isset($rows[$ccontent]->averagevalue)) {
+                        $avgvalue = $rows[$ccontent]->averagevalue;
+                        $osgood = false;
+                        if ($this->precise == 3) { // Osgood's semantic differential.
+                            $osgood = true;
+                        }
+                        if ($stravgvalue == '' && !$osgood) {
+                            $stravgvalue = ' ('.get_string('andaveragevalues', 'questionnaire').')';
+                        }
                     } else {
-                        $avg = 0;
+                        $avgvalue = null;
                     }
-                    $this->counts[$ccontent]->avg = $avg;
+                } else {
+                    $avg = 0;
                 }
-                $this->mkresavg(count($rids), $this->precise, $prtotal, $this->length, $sort);
-            } else {
-                foreach ($rows as $row) {
-                    $rank = $row->rank;
-                    $num = $row->num;
-                    if($rank == -1) {
-                        $rank = get_string('notapplicable', 'questionnaire');
-                    }
-                    $this->counts[$rank] += $num;
-                }
-                echo clean_text($this->content).'</div>';
-                $this->mkresrank(count($rids), $this->precise, $prtotal);
+                $this->counts[$ccontent]->avg = $avg;
+                $this->counts[$ccontent]->avgvalue = $avgvalue;
             }
+            $this->mkresavg(count($rids), $this->precise, $prtotal, $this->length, $sort, $stravgvalue);
+
+            $this->mkrescount($rids, $rows, $this->precise, $this->length, $sort);
         } else {
-            print_string('noresponsedata', 'questionnaire');
+            echo '<p class="generaltable">&nbsp;'.get_string('noresponsedata', 'questionnaire').'</p>';
         }
     }
 
-    function question_display($data, $qnum='') {
-        global $QTYPENAMES;
-        $method = $QTYPENAMES[$this->type_id].'_survey_display';
+    private function question_display($formdata, $descendantsdata, $qnum='', $blankquestionnaire) {
+        global $qtypenames;
+
+        $method = $qtypenames[$this->type_id].'_survey_display';
         if (method_exists($this, $method)) {
-            $this->questionstart_survey_display($qnum, $data);
-            $this->$method($data);
+            $this->questionstart_survey_display($qnum, $formdata, $descendantsdata);
+            $this->$method($formdata, $descendantsdata, $blankquestionnaire);
             $this->questionend_survey_display($qnum);
         } else {
             print_error('displaymethod', 'questionnaire');
         }
     }
 
-    function survey_display($data, $qnum='', $usehtmleditor=null) {
+    public function survey_display($formdata, $descendantsdata, $qnum='', $usehtmleditor=null, $blankquestionnaire=false) {
         if (!is_null($usehtmleditor)) {
-           $this->usehtmleditor = can_use_html_editor();
+            $this->usehtmleditor = can_use_html_editor();
         } else {
             $this->usehtmleditor = $usehtmleditor;
         }
 
-        $this->question_display($data, $qnum);
+        $this->question_display($formdata, $descendantsdata, $qnum, $blankquestionnaire);
     }
 
-    function questionstart_survey_display($qnum, $data='') {
-        global $OUTPUT;
-        if ($this->type_id == QUESSECTIONTEXT) {
-            return;
+    public function questionstart_survey_display($qnum, $formdata='') {
+        global $OUTPUT, $SESSION, $questionnaire, $PAGE;
+        $currenttab = $SESSION->questionnaire->current_tab;
+        $pagetype = $PAGE->pagetype;
+        $skippedquestion = false;
+        $skippedclass = '';
+        $autonum = $questionnaire->autonum;
+        // If no questions autonumbering.
+        $nonumbering = false;
+        if ($autonum != 1 && $autonum != 3) {
+            $qnum = '';
+            $nonumbering = true;
         }
-        echo html_writer::start_tag('fieldset', array('class' => 'qn-container'));
+        // If we are on report page and this questionnaire has dependquestions and this question was skipped.
+        if ( ($pagetype ==  'mod-questionnaire-myreport' || $pagetype ==  'mod-questionnaire-report')
+                        && $nonumbering == false
+                        && $this->dependquestion != 0 && !array_key_exists('q'.$this->id, $formdata)) {
+            $skippedquestion = true;
+            $skippedclass = ' unselected';
+            $qnum = '<span class="'.$skippedclass.'">('.$qnum.')</span>';
+        }
+        // In preview mode, hide children questions that have not been answered.
+        // In report mode, If questionnaire is set to no numbering,
+        // also hide answers to questions that have not been answered.
+        $displayclass = 'qn-container';
+        if ($pagetype == 'mod-questionnaire-preview' || ($nonumbering
+                        && ($currenttab == 'mybyresponse' || $currenttab == 'individualresp'))) {
+            $parent = questionnaire_get_parent ($this);
+            if ($parent) {
+                $dependquestion = $parent[$this->id]['qdependquestion'];
+                $dependchoice = $parent[$this->id]['qdependchoice'];
+                $parenttype = $parent[$this->id]['parenttype'];
+                $displayclass = 'hidedependquestion';
+                if (isset($formdata->{'q'.$this->id}) && $formdata->{'q'.$this->id}) {
+                    $displayclass = 'qn-container';
+                }
+
+                if ($this->type_id == QUESRATE) {
+                    foreach ($this->choices as $key => $choice) {
+                        if (isset($formdata->{'q'.$this->id.'_'.$key})) {
+                            $displayclass = 'qn-container';
+                            break;
+                        }
+                    }
+                }
+
+                if (isset($formdata->$dependquestion) && $formdata->$dependquestion == $dependchoice) {
+                    $displayclass = 'qn-container';
+                }
+
+                if ($parenttype == QUESDROP) {
+                    $qnid = 'qn-'.$this->id;
+                    if (isset($formdata->$dependquestion) && preg_match("/$qnid/", $formdata->$dependquestion)) {
+                        $displayclass = 'qn-container';
+                    }
+                }
+            }
+        }
+
+        echo html_writer::start_tag('fieldset', array('class' => $displayclass, 'id' => 'qn-'.$this->id));
         echo html_writer::start_tag('legend', array('class' => 'qn-legend'));
-        echo html_writer::start_tag('div', array('class' => 'qn-number'));
-        if ($this->required == 'y') {
-            echo html_writer::empty_tag('img',
-                array('class' => 'req',
-                    'title' => get_string('required', 'questionnaire'),
-                    'alt' => get_string('required', 'questionnaire'),
-                    'src' => $OUTPUT->pix_url('req')));
+
+        // Do not display the info box for the label question type.
+        if ($this->type_id != QUESSECTIONTEXT) {
+            echo html_writer::start_tag('div', array('class' => 'qn-info'));
+            echo html_writer::start_tag('div', array('class' => 'accesshide'));
+            echo get_string('questionnum', 'questionnaire');
+            echo html_writer::end_tag('div');
+            $required = '';
+            if ($this->required == 'y') {
+                $required = html_writer::empty_tag('img',
+                        array('class' => 'req',
+                                'title' => get_string('required', 'questionnaire'),
+                                'alt' => get_string('required', 'questionnaire'),
+                                'src' => $OUTPUT->pix_url('req')));
+            }
+            echo html_writer::tag('h2', $qnum, array('class' => 'qn-number'));
+            echo html_writer::start_tag('div', array('class' => 'accesshide'));
+            echo get_string('required', 'questionnaire');
+            echo html_writer::end_tag('div');
+            echo html_writer::end_tag('div');
+            echo $required;
         }
-        echo html_writer::start_tag('div', array('class' => 'accesshide'));
-        echo get_string('questionnum','questionnaire');
-        echo html_writer::end_tag('div');
-        echo $qnum;
-        echo html_writer::start_tag('div', array('class' => 'accesshide'));
-        echo get_string('required','questionnaire');
-        echo html_writer::end_tag('div');
-        echo html_writer::end_tag('div');
         echo html_writer::end_tag('legend');
-        echo html_writer::start_tag('div', array('class' => 'qn-question'));
+        echo html_writer::start_tag('div', array('class' => 'qn-content'));
+        echo html_writer::start_tag('div', array('class' => 'qn-question '.$skippedclass));
         if ($this->type_id == QUESNUMERIC || $this->type_id == QUESTEXT ||
             $this->type_id == QUESDROP) {
             echo html_writer::start_tag('label', array('for' => $this->type . $this->id));
@@ -1033,18 +1242,16 @@ class questionnaire_question {
             echo html_writer::end_tag('label');
         }
         echo html_writer::end_tag('div');
-        echo html_writer::start_tag('div', array('class' => 'qn-type'));
+        echo html_writer::start_tag('div', array('class' => 'qn-answer'));
     }
 
-    function questionend_survey_display() {
-        if ($this->type_id == QUESSECTIONTEXT) {
-            return;
-        }
+    public function questionend_survey_display() {
         echo html_writer::end_tag('div');
         echo html_writer::end_tag('fieldset');
     }
-    function response_check_required ($data) { // JR check all question types
-        if ($this->type_id == 8) { // Rate is a special case
+
+    private function response_check_required ($data) { // JR check all question types
+        if ($this->type_id == QUESRATE) { // Rate is a special case.
             foreach ($this->choices as $cid => $choice) {
                 $str = 'q'."{$this->id}_$cid";
                 if (isset($data->$str)) {
@@ -1052,18 +1259,36 @@ class questionnaire_question {
                 }
             }
         }
-        if( ($this->required == 'y') &&  empty($data->{'q'.$this->id}) ) {
+        if ( ($this->required == 'y') &&  empty($data->{'q'.$this->id}) ) {
             return ('*');
         } else {
             return ('&nbsp;');
         }
     }
 
-    function yesno_survey_display($data) {
-        /// moved choose_from_radio() here to fix unwanted selection of yesno buttons and radio buttons with identical ID
+    private function yesno_survey_display($data, $descendantsdata, $blankquestionnaire=false) {
+        // Moved choose_from_radio() here to fix unwanted selection of yesno buttons and radio buttons with identical ID.
+
+        // To display or hide dependent questions on Preview page.
+        $onclickdepend = array();
+        if ($descendantsdata) {
+            $descendants = implode(',', $descendantsdata['descendants']);
+            if (isset($descendantsdata['choices'][0])) {
+                $choices['y'] = implode(',', $descendantsdata['choices'][0]);
+            } else {
+                $choices['y'] = '';
+            }
+            if (isset($descendantsdata['choices'][1])) {
+                $choices['n'] = implode(',', $descendantsdata['choices'][1]);
+            } else {
+                $choices['n'] = '';
+            }
+            $onclickdepend['y'] = ' onclick="depend(\''.$descendants.'\', \''.$choices['y'].'\')"';
+            $onclickdepend['n'] = ' onclick="depend(\''.$descendants.'\', \''.$choices['n'].'\')"';
+        }
         static $stryes = null;
         static $strno = null;
-        global $idcounter;  // To make sure all radio buttons have unique ids. // JR 20 NOV 2007
+        global $idcounter;  // To make sure all radio buttons have unique ids. // JR 20 NOV 2007.
 
         if (is_null($stryes)) {
              $stryes = get_string('yes');
@@ -1074,66 +1299,67 @@ class questionnaire_question {
         $val2 = 'n';
 
         $options = array($val1 => $stryes, $val2 => $strno);
-        $name =  'q'.$this->id;
-        $checked=(isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:'');
-
-        $output = '<span class="radiogroup '.$name."\">\n";
-
-        $currentradio = 0;
+        $name = 'q'.$this->id;
+        $checked = (isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:'');
+        $output = '';
         $ischecked = false;
+
         foreach ($options as $value => $label) {
             $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
-            $output .= ' <span class="radioelement '.$name.' rb'.$currentradio."\">";
             $output .= '<input name="'.$name.'" id="'.$htmlid.'" type="radio" value="'.$value.'"';
             if ($value == $checked) {
                 $output .= ' checked="checked"';
                 $ischecked = true;
             }
-            $output .= ' /> <label for="'.$htmlid.'" style="vertical-align:top;">'.  $label .'</label></span>' .  "\n";
-            $currentradio = ($currentradio + 1) % 2;
+            if (isset($onclickdepend[$value])) {
+                $output .= $onclickdepend[$value];
             }
-        // CONTRIB-846
+            $output .= ' /><label for="'.$htmlid.'">'. $label .'</label>' . "\n";
+        }
+        // CONTRIB-846.
         if ($this->required == 'n') {
             $id='';
             $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
-            $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"'.
-                ' onclick="other_check_empty(name, value)"';
-            if (!$ischecked) {
+            $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"';
+            if (!$ischecked && !$blankquestionnaire) {
                 $output .= ' checked="checked"';
             }
-            $content = get_string('noanswer','questionnaire');
-            $output .= ' />&nbsp;<label for="'.$htmlid.'" style="vertical-align:top;">'.
-                format_text($content, FORMAT_HTML).'</label>&nbsp;&nbsp;';
-            $currentradio = ($currentradio + 1) % 2;
+            if ($onclickdepend) {
+                $output .= ' onclick="depend(\''.$descendants.'\', \'\')"';
+            }
+            $content = get_string('noanswer', 'questionnaire');
+            $output .= ' /><label for="'.$htmlid.'" >'.
+                format_text($content, FORMAT_HTML).'</label>';
         }
-        // end CONTRIB-846
+        // End CONTRIB-846.
 
-        $output .= '</span>' .  "\n";
+        $output .= '</span>' . "\n";
         echo $output;
     }
 
-    function text_survey_display($data) { // Text Box
-        echo '<input type="text" size="'.$this->length.'" name="q'.$this->id.'"'.
+    private function text_survey_display($data) { // Text Box.
+        echo '<input onkeypress="return event.keyCode != 13;" type="text" size="'.$this->length.'" name="q'.$this->id.'"'.
              ($this->precise > 0 ? ' maxlength="'.$this->precise.'"' : '').' value="'.
              (isset($data->{'q'.$this->id}) ? stripslashes($data->{'q'.$this->id}) : '').
              '" id="' . $this->type . $this->id . '" />';
     }
 
-    function essay_survey_display($data) { // Essay
+    private function essay_survey_display($data) { // Essay.
         $cols = $this->length;
         $rows = $this->precise;
         $str = '';
-        // if NO cols or rows specified: use HTML editor (if available in this context)
+        // If NO cols or rows specified: use HTML editor (if available in this context).
         if (!$cols || !$rows) {
             $cols = 60;
             $rows = 5;
             $canusehtmleditor = $this->usehtmleditor;
 
-        // if cols & rows specified, do not use HTML editor but plain text box
-        // use default (60 cols and 5 rows) OR user-specified values
+            // If cols & rows specified, do not use HTML editor but plain text box
+            // use default (60 cols and 5 rows) OR user-specified values.
         } else {
             $canusehtmleditor = false;
         }
+
         $name = 'q'.$this->id;
         if (isset($data->{'q'.$this->id})) {
             $value = $data->{'q'.$this->id};
@@ -1141,20 +1367,24 @@ class questionnaire_question {
             $value = '';
         }
         if ($canusehtmleditor) {
-            print_textarea($canusehtmleditor, '', '', $cols, $rows, $name, $value);
+            $editor = editors_get_preferred_editor();
+            $editor->use_editor($name, questionnaire_get_editor_options($this->context));
+            $texteditor = html_writer::tag('textarea', $value,
+                            array('id' => $name, 'name' => $name, '', ''));
+            echo $texteditor;
         } else {
-            $str .= '<textarea class="form-textarea" id="edit-'. $name .'" name="'. $name .'" rows="'. $rows .'" cols="'. $cols .'">'
-            .s($value).'</textarea>';
+            $str .= '<textarea class="form-textarea" id="edit-'. $name .'" name="'. $name .'" rows="'.
+                $rows .'" cols="'. $cols .'">'.s($value).'</textarea>';
             echo $str;
         }
     }
 
-    function radio_survey_display($data) { // Radio buttons
-        global $idcounter;  // To make sure all radio buttons have unique ids. // JR 20 NOV 2007
-        $currentradio = 0;
+    private function radio_survey_display($data, $descendantsdata, $blankquestionnaire=false) { // Radio buttons
+        global $idcounter;  // To make sure all radio buttons have unique ids. // JR 20 NOV 2007.
+
         $otherempty = false;
         $output = '';
-        // find out which radio button is checked (if any); yields choice ID
+        // Find out which radio button is checked (if any); yields choice ID.
         if (isset($data->{'q'.$this->id})) {
             $checked = $data->{'q'.$this->id};
         } else {
@@ -1162,50 +1392,64 @@ class questionnaire_question {
         }
         $horizontal = $this->length;
         $ischecked = false;
+
+        // To display or hide dependent questions on Preview page.
+        $onclickdepend = array();
+        if ($descendantsdata) {
+            $descendants = implode(',', $descendantsdata['descendants']);
+            foreach ($descendantsdata['choices'] as $key => $choice) {
+                $choices[$key] = implode(',', $choice);
+                $onclickdepend[$key] = ' onclick="depend(\''.$descendants.'\', \''.$choices[$key].'\')"';
+            }
+        } // End dependents.
+
         foreach ($this->choices as $id => $choice) {
             $other = strpos($choice->content, '!other');
-            if ($other !== 0)  { // this is a normal radio button
-                $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
-                if ($horizontal) {
-                    $output .= ' <span class="radioelement">';
+            if ($horizontal) {
+                $output .= ' <span style="white-space:nowrap;">';
+            }
+
+            // To display or hide dependent questions on Preview page.
+            $onclick = '';
+            if ($onclickdepend) {
+                if (isset($onclickdepend[$id])) {
+                    $onclick = $onclickdepend[$id];
+                } else {
+                    // In case this dependchoice is not used by any child question.
+                    $onclick = ' onclick="depend(\''.$descendants.'\', \'\')"';
                 }
-                $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"'.
-                    ' onclick="other_check_empty(name, value)"';
+
+            } else {
+                $onclick = ' onclick="other_check_empty(name, value)"';
+            } // End dependents.
+
+            if ($other !== 0) { // This is a normal radio button.
+                $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
+
+                $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"'.$onclick;
                 if ($id == $checked) {
                     $output .= ' checked="checked"';
                     $ischecked = true;
                 }
+
                 $content = $choice->content;
-                $valign = 'top';
                 $contents = questionnaire_choice_values($choice->content);
-                if ($contents->image != '') {
-                     $valign = 'baseline';
-                }
-                $output .= ' />&nbsp;<label for="'.$htmlid.'" style="vertical-align:'.$valign.';">'.
-                    format_text($contents->text, FORMAT_HTML).$contents->image.'</label>&nbsp;&nbsp;';
-                $currentradio = ($currentradio + 1) % 2;
-                if ($horizontal) {
-                    $output .='</span>';
-                } else {
-                    $output .= '<br />';
-                }
-            } else { // radio button with associated !other text field
-                $other_text = preg_replace(
-                        array("/^!other=/","/^!other/"),
+                $output .= ' /><label for="'.$htmlid.'" >'.
+                    format_text($contents->text, FORMAT_HTML).$contents->image.'</label>';
+            } else {             // Radio button with associated !other text field.
+                $othertext = preg_replace(
+                        array("/^!other=/", "/^!other/"),
                         array('', get_string('other', 'questionnaire')),
                         $choice->content);
                 $cid = 'q'.$this->id.'_'.$id;
                 $otherempty = false;
                 $otherid = 'q'.$this->id.'_'.$checked;
-                if (substr($checked, 0, 6) == 'other_') { // fix bug CONTRIB-222
-                    $checked = substr($checked,6);
+                if (substr($checked, 0, 6) == 'other_') { // Fix bug CONTRIB-222.
+                    $checked = substr($checked, 6);
                 }
                 $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
-                if ($horizontal) {
-                    $output .= ' <span style="white-space:nowrap;">';
-                }
-                $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="other_'.$id.'"'.
-                    ' onclick="other_check_empty(name, value)"';
+
+                $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="other_'.$id.'"'.$onclick;
                 if (($id == $checked) || !empty($data->$cid)) {
                     $output .= ' checked="checked"';
                     $ischecked = true;
@@ -1213,254 +1457,222 @@ class questionnaire_question {
                         $otherempty = true;
                     }
                 }
-                $output .= ' /> <label for="'.$htmlid.'" style="vertical-align:top;">'.format_text($other_text, FORMAT_HTML).'</label>';
-                $currentradio = ($currentradio + 1) % 2;
+                $output .= ' /><label for="'.$htmlid.'" >'.format_text($othertext, FORMAT_HTML).'</label>';
 
-                $choices['other_'.$cid] = $other_text;
-                $output .= '&nbsp;<input type="text" size="25" name="'.$cid.'" onclick="other_check(name)"';
+                $choices['other_'.$cid] = $othertext;
+                $output .= '<input type="text" size="25" name="'.$cid.'" onclick="other_check(name)"';
                 if (isset($data->$cid)) {
                     $output .= ' value="'.stripslashes($data->$cid) .'"';
                 }
-                $output .= ' />';
-                if ($horizontal) {
-                    $output .= '</span>';
-                } else {
-                    $output .= '<br />';
-                }
+                $output .= ' />&nbsp;';
             }
-        }
-
-        // CONTRIB-846
-        if ($this->required == 'n') {
-            $id='';
-            $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
             if ($horizontal) {
-                $output .= ' <span class="radioelement">';
-                }
-            $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"'.
-                ' onclick="other_check_empty(name, value)"';
-            if (!$ischecked) {
-                $output .= ' checked="checked"';
-            }
-            $valign = 'top';
-            $content = get_string('noanswer','questionnaire');
-            $output .= ' />&nbsp;<label for="'.$htmlid.'" style="vertical-align:'.$valign.';">'.
-                format_text($content, FORMAT_HTML).'</label>&nbsp;&nbsp;';
-            $currentradio = ($currentradio + 1) % 2;
-            if ($horizontal) {
-                $output .='</span>';
+                // Added a zero-width space character to make MSIE happy!
+                $output .= '</span>&#8203;';
             } else {
                 $output .= '<br />';
             }
         }
-        // end CONTRIB-846
+
+        // CONTRIB-846.
+        if ($this->required == 'n') {
+            $id='';
+            $htmlid = 'auto-rb'.sprintf('%04d', ++$idcounter);
+            if ($horizontal) {
+                $output .= ' <span style="white-space:nowrap;">';
+            }
+
+            // To display or hide dependent questions on Preview page.
+            $onclick = '';
+            if ($onclickdepend) {
+                $onclick = ' onclick="depend(\''.$descendants.'\', \'\')"';
+            } else {
+                $onclick = ' onclick="other_check_empty(name, value)"';
+            } // End dependents.
+            $output .= '<input name="q'.$this->id.'" id="'.$htmlid.'" type="radio" value="'.$id.'"'.$onclick;
+            if (!$ischecked && !$blankquestionnaire) {
+                $output .= ' checked="checked"';
+            }
+            $content = get_string('noanswer', 'questionnaire');
+            $output .= ' /><label for="'.$htmlid.'" >'.
+                format_text($content, FORMAT_HTML).'</label>';
+
+            if ($horizontal) {
+                $output .= '</span>&nbsp;&nbsp;';
+            } else {
+                $output .= '<br />';
+            }
+        }
+        // End CONTRIB-846.
 
         echo $output;
         if ($otherempty) {
             questionnaire_notify (get_string('otherempty', 'questionnaire'));
         }
     }
-    function dbase_survey_display($data) { // Database 
-	global $CFG;
-        global $DB;
-        global $SESSION;
-        global $USER;
- $myEntries = array();
- $myHeader = array();
- $options = array();
 
-	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
-                $currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
-        } else {
-           	$cm = get_coursemodule_from_instance('questionnaire',$this->survey_id);
- 		$currentsessiongroupid = groups_get_activity_group($cm);
-            $SESSION->questionnaire->currentsessiongroupid = $currentsessiongroupid;
-	}
-		
-	 //print_r($data);
-//FPS need the database id to pull fieldnames for entries, using default rows.	The saved values come from locallib.php
-// See response_select in locallib.php in form q(no)-fieldid-row.
-/* This pulls data from fields to create data entry table, need ids for return values*/
- $sql = "select  c.id,c.type,c.name,c.description,c.param1 FROM {$CFG->prefix}data_fields c where dataid = $this->precise;";
-                $results = $DB->get_records_sql($sql);
-		echo '<table class="qnInnerTable" style="width:100%" cellpadding="10"  cellspacing="1"> <tr>';
-		for ($j = 1; $j <= $this->length; $j++) {
-                foreach ($results as $key => $result) {
-    
-		$myHeader[] =  "<td>".$result->description ."</td>";
-//print($currentsessiongroupid);
-//print($sql);
-// Issue is what is htmlwriter called to do.. should be last.  or if empty then ---
-// Oct 2012 pass the rid around hidden field with same numerical, start with rid 
-/* $result->id is the field id ; */
-            switch ($result->type) {
-            case 'menu' :
-// Menu items saved with line feed ... perhaps without and strip them at answer below check what data does, for compatibility.
-		$myMenu='';
-		 foreach (explode("\n",$result->param1 ) as $answer)
-        	{
-		 $options[$answer]=$answer;
-		}
-                $myMenu .= html_writer::select($options, 'q'.$this->id.'_'.$result->id.'_'.$j, (isset($data->{'q'.$this->id.'_'.$result->id.'_'.$j})?$data->{'q'.$this->id.'_'.$result->id.'_'.$j}:''), array(''=>'choosedots'), array('id' => $this->type . $this->id));
-
-			$myEntries[] = "<td>".$myMenu."</td>";
-                break;
-            case 'checkbox':
-		$myChecks='';
-		$id=1;
-		 foreach (explode("\n",$result->param1 ) as $answer)
-        	{
-/* Needs to be true if better is = answer */
-
-if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
-               $myChecks .= html_writer::checkbox('q'.$this->id.'_'.$result->id.'-'.$j.'[]', $id, ($answer == $data->{'q'.$this->id.'_'.$result->id.'_'.$j}), format_text($answer, FORMAT_HTML)).'<br>';
-               // echo html_writer::checkbox('q'.$this->id.'[]', $id, in_array($id, $data->{'q'.$this->id}),
-} else{ 
-               $myChecks .= html_writer::checkbox('q'.$this->id.'_'.$result->id.'-'.$j.'[]', $id,false , format_text($answer, FORMAT_HTML)).'<br>';
-}
-                 //                          format_text($contents->text, FORMAT_HTML).$contents->image);
-		$id++;
-		}
-			$myEntries[] = "<td>".$myChecks."</td>";
-                break;
-            case 'textarea':
-		$myEntries[]= '<td><div class="qn-type"><textarea class="form-textarea" id="edit-q'.$this->id.'_'.$j.'" name="q'.$this->id.'_'.$result->id.'_'.$j.'" rows="5" cols="60">'. stripslashes((isset($data->{'q'.$this->id.'_'.$result->id.'_'.$j})?$data->{'q'.$this->id.'_'.$result->id.'_'.$j}:'')).'</textarea></div></fieldset></td>';
-                break;
-            case 'text':
-                $other_text = '&nbsp;<input type="text" size="25" name="q'.$this->id.'_'.$result->id.'_'.$j.'"  id="q'.$this->id.'_'.$result->id.'_'.$j.'"';
-                $other_text .=  ' value="'.stripslashes((isset($data->{'q'.$this->id.'_'.$result->id.'_'.$j})?$data->{'q'.$this->id.'_'.$result->id.'_'.$j}:'')).'"';
-                $other_text .= ' /><br />';
-		$myEntries[]= '<td><div class="qn-type">'. $other_text.' </div></fieldset></td>';
-                break;
-		}
-
-                //    unset($results[$key]);
-		    
-                }
-		print("</tr><tr>");
-		foreach ($myEntries as $val) { 
-		print("</td><td>");
-			print( $val );
-		}
-	// check index 	print("</td><td>".$j);
- 		$myEntries = array();
-                }
-
- 	echo "<tr></table>";
-	unset($results);
-
-	}
-
-    function check_survey_display($data) { // Check boxes
+    private function check_survey_display($data) { // Check boxes.
         $otherempty = false;
-        if (!isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id})) {
-            $data->{'q'.$this->id} = array();
-        }
-        // Verify that number of checked boxes (nbboxes) is within set limits (length = min; precision = max)
-        if ( $data->{'q'.$this->id} ) {
-            $otherempty = false;
-            $boxes = $data->{'q'.$this->id};
-            $nbboxes = count($boxes);
-            foreach ($boxes as $box) {
-                $pos = strpos($box, 'other_');
-                if (is_int($pos) == true) {
-                    $otherchoice = substr($box,6);
-                    $resp = 'q'.$this->id.''.substr($box,5);
-                    if (!$data->$resp) {
-                        $otherempty = true;
+        if (!empty($data) ) {
+            if (!isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id})) {
+                $data->{'q'.$this->id} = array();
+            }
+            // Verify that number of checked boxes (nbboxes) is within set limits (length = min; precision = max).
+            if ( $data->{'q'.$this->id} ) {
+                $otherempty = false;
+                $boxes = $data->{'q'.$this->id};
+                $nbboxes = count($boxes);
+                foreach ($boxes as $box) {
+                    $pos = strpos($box, 'other_');
+                    if (is_int($pos) == true) {
+                        $otherchoice = substr($box, 6);
+                        $resp = 'q'.$this->id.''.substr($box, 5);
+                        if (!$data->$resp) {
+                            $otherempty = true;
+                        }
                     }
                 }
-            }
-            $nbchoices = count($this->choices);
-            $min = $this->length;
-            $max = $this->precise;
-            if ($max == 0) {
-                $max = $nbchoices;
-            }
-            if ($min > $max) {
-                $min = $max; // sanity check
-            }
-            $min = min($nbchoices, $min);
-            $msg = '';
-            if ($nbboxes < $min || $nbboxes > $max) {
-                $msg = get_string('boxesnbreq', 'questionnaire');
-                if ($min == $max) {
-                    $msg .= '&nbsp;'.get_string('boxesnbexact', 'questionnaire', $min);
-                } else {
-                    if ($min && ($nbboxes < $min)) {
-                        $msg .= get_string('boxesnbmin', 'questionnaire', $min);
-                        if ($nbboxes > $max) {
-                            $msg .= ' & ' .get_string('boxesnbmax', 'questionnaire', $max);
-                        }
+                $nbchoices = count($this->choices);
+                $min = $this->length;
+                $max = $this->precise;
+                if ($max == 0) {
+                    $max = $nbchoices;
+                }
+                if ($min > $max) {
+                    $min = $max; // Sanity check.
+                }
+                $min = min($nbchoices, $min);
+                $msg = '';
+                if ($nbboxes < $min || $nbboxes > $max) {
+                    $msg = get_string('boxesnbreq', 'questionnaire');
+                    if ($min == $max) {
+                        $msg .= '&nbsp;'.get_string('boxesnbexact', 'questionnaire', $min);
                     } else {
-                        if ($nbboxes > $max ) {
-                            $msg .= get_string('boxesnbmax', 'questionnaire', $max);
+                        if ($min && ($nbboxes < $min)) {
+                            $msg .= get_string('boxesnbmin', 'questionnaire', $min);
+                            if ($nbboxes > $max) {
+                                $msg .= ' & ' .get_string('boxesnbmax', 'questionnaire', $max);
+                            }
+                        } else {
+                            if ($nbboxes > $max ) {
+                                $msg .= get_string('boxesnbmax', 'questionnaire', $max);
+                            }
                         }
                     }
+                    questionnaire_notify($msg);
                 }
-                questionnaire_notify($msg);
             }
         }
+
         foreach ($this->choices as $id => $choice) {
 
             $other = strpos($choice->content, '!other');
-            if ($other !== 0)  { // this is a normal check box
+            if ($other !== 0) { // This is a normal check box.
                 $contents = questionnaire_choice_values($choice->content);
-                echo html_writer::checkbox('q'.$this->id.'[]', $id, in_array($id, $data->{'q'.$this->id}),
-                                           format_text($contents->text, FORMAT_HTML).$contents->image);
+                $checked = false;
+                if (!empty($data) ) {
+                    $checked = in_array($id, $data->{'q'.$this->id});
+                }
+                echo html_writer::checkbox('q'.$this->id.'[]', $id, $checked,
+                                               format_text($contents->text, FORMAT_HTML).$contents->image);
                 echo '<br />';
-            } else { // check box with associated !other text field
-                // in case length field has been used to enter max number of choices, set it to 20
-                $other_text = preg_replace(
-                        array("/^!other=/","/^!other/"),
+            } else {             // Check box with associated !other text field.
+                // In case length field has been used to enter max number of choices, set it to 20.
+                $othertext = preg_replace(
+                        array("/^!other=/", "/^!other/"),
                         array('', get_string('other', 'questionnaire')),
                         $choice->content);
                 $cid = 'q'.$this->id.'_'.$id;
-                if (!empty($data->$cid)) {
+                if (!empty($data) && !empty($data->$cid)) {
                     $checked = true;
                 } else {
                     $checked = false;
                 }
                 $name = 'q'.$this->id.'[]';
                 $value = 'other_'.$id;
-                echo html_writer::checkbox($name, $value, $checked, format_text($other_text.'', FORMAT_HTML));
-                $other_text = '&nbsp;<input type="text" size="25" name="'.$cid.'" onclick="other_check(name)"';
+
+                echo html_writer::checkbox($name, $value, $checked, format_text($othertext.'', FORMAT_HTML));
+                $othertext = '&nbsp;<input type="text" size="25" name="'.$cid.'" onclick="other_check(name)"';
                 if ($cid) {
-                    $other_text .= ' value="'. (!empty($data->$cid) ? stripslashes($data->$cid) : '') .'"';
+                    $othertext .= ' value="'. (!empty($data->$cid) ? stripslashes($data->$cid) : '') .'"';
                 }
-                $other_text .= ' />';
-                echo $other_text.'<br />';
+                $othertext .= ' />';
+                echo $othertext.'<br />';
             }
         }
-            if ($otherempty) {
-                questionnaire_notify (get_string('otherempty', 'questionnaire'));
-            }
+        if ($otherempty) {
+            questionnaire_notify (get_string('otherempty', 'questionnaire'));
+        }
     }
 
-    function drop_survey_display($data) { // Drop
+    private function drop_survey_display($data, $descendantsdata) { // Drop.
         global $OUTPUT;
-
         $options = array();
-        foreach ($this->choices as $id => $choice) {
-            if ($pos = strpos($choice->content, '=')) {
-                $choice->content = substr($choice->content, $pos + 1);
+
+        // To display or hide dependent questions on Preview page.
+        if ($descendantsdata) {
+            $qdropid = 'q'.$this->id;
+            $descendants = implode(',', $descendantsdata['descendants']);
+            foreach ($descendantsdata['choices'] as $key => $choice) {
+                $choices[$key] = implode(',', $choice);
             }
-            $options[$id] = $choice->content;
+            foreach ($this->choices as $key => $choice) {
+                if ($pos = strpos($choice->content, '=')) {
+                    $choice->content = substr($choice->content, $pos + 1);
+                }
+                if (isset($choices[$key])) {
+                    $value = $choices[$key];
+                } else {
+                    $value = $key;
+                }
+                $options[$value] = $choice->content;
+            }
+            $dependdrop = "dependdrop('$qdropid', '$descendants')";
+            echo html_writer::select($options, $qdropid, (isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:''),
+                            array(''=>'choosedots'), array('id' => $qdropid, 'onchange' => $dependdrop));
+            // End dependents.
+        } else {
+            foreach ($this->choices as $key => $choice) {
+                if ($pos = strpos($choice->content, '=')) {
+                    $choice->content = substr($choice->content, $pos + 1);
+                }
+                $options[$key] = $choice->content;
+            }
+            echo html_writer::select($options, 'q'.$this->id,
+                (isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:''),
+                array(''=>'choosedots'), array('id' => $this->type . $this->id));
         }
-        echo html_writer::select($options, 'q'.$this->id,
-            (isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:''),
-            array(''=>'choosedots'), array('id' => $this->type . $this->id));
     }
 
-    function rate_survey_display($data) { // Rate
-        if (!isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id})) {
+    private function rate_survey_display($data, $blankquestionnaire=false) { // Rate.
+        if (!empty($data) && ( !isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id}) ) ) {
             $data->{'q'.$this->id} = array();
         }
-        echo '<table border="0" cellspacing="1" cellpadding="0">';
+        $osgood = false;
+        if ($this->precise == 3) { // Osgood's semantic differential.
+            $osgood = true;
+        }
+        // Check if rate question has one line only to display full width columns of choices.
+        $nocontent = false;
+        foreach ($this->choices as $cid => $choice) {
+            if ($choice->content == '') {
+                $nocontent = true;
+                break;
+            }
+        }
+        // The 0.1% right margin is needed to avoid the horizontal scrollbar in Chrome!
+        echo '<table style="width:99.9%">';
         echo '<tbody>';
         echo '<tr>';
-        echo '<td></td>';
-        $bg = 'qntype c0';
+        if ($osgood) {
+            $width = '19%';
+        } else if ($nocontent) {
+            $width = '0%';
+        } else {
+            $width = '29%';
+        }
+        echo '<td style="width: '.$width.'"></td>';
+
         if ($this->precise == 1) {
             $na = get_string('notapplicable', 'questionnaire');
         } else {
@@ -1471,34 +1683,36 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         } else {
             $order = '';
         }
-        $osgood = false;
-        if ($this->precise == 3) { // Osgood's semantic differential
-            $osgood = true;
-        }
+
         $nameddegrees = 0;
         $n = array();
         $mods = array();
         foreach ($this->choices as $cid => $choice) {
             $content = $choice->content;
-            // check for number from 1 to 3 digits, followed by the equal sign = (to accomodate named degrees)
-            if (preg_match("/^([0-9]{1,3})=(.*)$/", $content,$ndd)) {
+            // Check for number from 1 to 3 digits, followed by the equal sign = (to accomodate named degrees).
+            if (preg_match("/^([0-9]{1,3})=(.*)$/", $content, $ndd)) {
                 $n[$nameddegrees] = format_text($ndd[2], FORMAT_HTML);
                 $this->choices[$cid] = '';
                 $nameddegrees++;
-            }
-            else {
+            } else {
                 $contents = questionnaire_choice_values($content);
                 if ($contents->modname) {
                     $choice->content = $contents->text;
                 }
-             }
+            }
         }
-        // if we have named degrees, provide for wider degree columns (than for numbers)
-        // do not provide wider degree columns if we have an Osgood's semantic differential
-        if ($nameddegrees && !$osgood) {
-            $colwidth = 'auto';
+        // If we have named degrees, provide for wider degree columns (than for numbers)
+        // do not provide wider degree columns if we have an Osgood's semantic differential.
+
+        if ($osgood) {
+            $colwidth = (60 / $this->length).'%';
+            $textalign = 'right';
+        } else if ($nocontent) {
+            $colwidth = (100 / $this->length).'%';
+            $textalign = 'left';
         } else {
-            $colwidth = '40px';
+            $colwidth = (70 / $this->length).'%';
+            $textalign = 'left';
         }
         for ($j = 0; $j < $this->length; $j++) {
             if (isset($n[$j])) {
@@ -1506,22 +1720,17 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
             } else {
                 $str = $j+1;
             }
-            echo '<td style="width:'.$colwidth.'; text-align:center;" class="'.$bg.'">'.$str.'</td>';
-            if ($bg == 'qntype c0') {
-                $bg = 'qntype c1';
-            } else {
-                $bg = 'qntype c0';
-            }
+            echo '<td style="width:'.$colwidth.'; text-align:center;" >'.$str.'</td>';
         }
         if ($na) {
-            echo '<td style="width:'.$colwidth.'; text-align:center;" class="'.$bg.'">'.$na.'</td>';
+            echo '<td style="width:'.$colwidth.'; text-align:center;" >'.$na.'</td>';
         }
         echo '</tr>';
 
         $num = 0;
-        if ($this->precise != 2) {  //dev jr 9 JUL 2010
+        if ($this->precise != 2) {
             $nbchoices = count($this->choices) - $nameddegrees;
-        } else { // if "No duplicate choices", can restrict nbchoices to number of rate items specified
+        } else { // If "No duplicate choices", can restrict nbchoices to number of rate items specified.
             $nbchoices = $this->length;
         }
 
@@ -1535,22 +1744,16 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         if ( ($num != $nbchoices) && ($num!=0) ) {
             questionnaire_notify(get_string('checkallradiobuttons', 'questionnaire', $nbchoices));
         }
-        $bgr = 'qntype r0';
         foreach ($this->choices as $cid => $choice) {
             if (isset($choice->content)) {
                 $str = 'q'."{$this->id}_$cid";
-                echo '<tr>';
+                echo '<tr class="raterow">';
                 $content = $choice->content;
                 if ($osgood) {
                     list($content, $contentright) = preg_split('/[|]/', $content);
                 }
-                echo '<td class="'.$bgr.'">'.format_text($content, FORMAT_HTML).'&nbsp;</td>';
-                if ($bgr == 'qntype r0') {
-                    $bgr = 'qntype r1';
-                } else {
-                    $bgr = 'qntype r0';
-                }
-                $bg = 'qntype c0';
+                echo '<td style="text-align: '.$textalign.';">'.format_text($content, FORMAT_HTML).'&nbsp;</td>';
+                $bg = 'c0 raterow';
                 for ($j = 0; $j < $this->length; $j++) {
                     $checked = ((isset($data->$str) && ($j == $data->$str)) ? ' checked="checked"' : '');
                     echo '<td style="text-align:center" class="'.$bg.'">';
@@ -1558,30 +1761,26 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                     echo html_writer::tag('span', get_string('option', 'questionnaire', $i),
                         array('class' => 'accesshide'));
                     echo '<input name="'.$str.'" type="radio" value="'.$j .'"'.$checked.$order.' /></td>';
-                                        if ($bg == 'qntype c0') {
-                        $bg = 'qntype c1';
+                    if ($bg == 'c0 raterow') {
+                        $bg = 'c1 raterow';
                     } else {
-                        $bg = 'qntype c0';
+                        $bg = 'c0 raterow';
                     }
                 }
                 if ($na) {
                     if ( (in_array($na, $data->{'q'.$this->id})) ||
                             (isset($data->$str) && $data->$str == -1) ||
-                            $this->required == 'n' ) { // automatically check N/A buttons if rate question is not required
+                            $this->required == 'n' && !$blankquestionnaire) {
+                        // Automatically check N/A buttons if rate question is not required except if we are printing questionnaire.
                         $checked = ' checked="checked"';
                     } else {
                         $checked = '';
                     }
-                    echo '<td style="width:40; text-align:center" class="'.$bg.'">';
+                    echo '<td style="width:auto; text-align:center" class="'.$bg.'">';
                     echo '<input name="'.$str.'" type="radio" value="'.$na.'"'.$checked.' /></td>';
                 }
                 if ($osgood) {
-                    if ($bgr == 'qntype r0') {
-                        $bgr2 = 'qntype r1';
-                    } else {
-                        $bgr2 = 'qntype r0';
-                    }
-                    echo '<td class="'.$bgr2.'">&nbsp;'.format_text($contentright, FORMAT_HTML).'</td>';
+                    echo '<td>&nbsp;'.format_text($contentright, FORMAT_HTML).'</td>';
                 }
                 echo '</tr>';
             }
@@ -1590,60 +1789,34 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         echo '</table>';
     }
 
-    function date_survey_display($data) { // Date
+    private function date_survey_display($data) { // Date.
 
-        $date_mess = html_writer::start_tag('div', array('class' => 'qn-datemsg'));
-        $date_mess .= get_string('dateformatting', 'questionnaire');
-        $date_mess .= html_writer::end_tag('div');
-                if (!empty($data->{'q'.$this->id})) {
+        $datemess = html_writer::start_tag('div', array('class' => 'qn-datemsg'));
+        $datemess .= get_string('dateformatting', 'questionnaire');
+        $datemess .= html_writer::end_tag('div');
+        if (!empty($data->{'q'.$this->id})) {
             $dateentered = $data->{'q'.$this->id};
             $setdate = questionnaire_check_date ($dateentered, false);
             if ($setdate == 'wrongdateformat') {
                 $msg = get_string('wrongdateformat', 'questionnaire', $dateentered);
                 questionnaire_notify($msg);
-            } elseif ($setdate == 'wrongdaterange') {
+            } else if ($setdate == 'wrongdaterange') {
                 $msg = get_string('wrongdaterange', 'questionnaire');
                 questionnaire_notify($msg);
             } else {
                 $data->{'q'.$this->id} = $setdate;
             }
         }
-        echo $date_mess;
+        echo $datemess;
         echo html_writer::start_tag('div', array('class' => 'qn-date'));
-        echo '<input type="text" size="12" name="q'.$this->id.'" maxlength="10" value="'.
+        echo '<input onkeypress="return event.keyCode != 13;" type="text" size="12" name="q'.$this->id.'" maxlength="10" value="'.
              (isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} : '').'" />';
         echo html_writer::end_tag('div');
     }
 
-    function data_survey_display($data) { // Data
-/* FPS Not sure about this at all  */
-        $date_mess = html_writer::start_tag('div', array('class' => 'qn-datamsg'));
-        $date_mess .= get_string('dateformatting', 'questionnaire');
-        $date_mess .= html_writer::end_tag('div');
-                if (!empty($data->{'q'.$this->id})) {
-            $dateentered = $data->{'q'.$this->id};
-            $setdate = check_date ($dateentered, false);
-            if ($setdate == 'wrongdateformat') {
-                $msg = get_string('wrongdateformat', 'questionnaire', $dateentered);
-                questionnaire_notify($msg);
-            } elseif ($setdate == 'wrongdaterange') {
-                $msg = get_string('wrongdaterange', 'questionnaire');
-                questionnaire_notify($msg);
-            } else {
-                $data->{'q'.$this->id} = $setdate;
-            }
-        }
-        echo $date_mess;
-        echo html_writer::start_tag('div', array('class' => 'qn-date'));        
-        echo '<input type="text" size="12" name="q'.$this->id.'" maxlength="10" value="'.
-             (isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} : '').'" />';
-        echo html_writer::end_tag('div');
-    }
-
-    function numeric_survey_display($data) { // Numeric
+    private function numeric_survey_display($data) { // Numeric.
         $precision = $this->precise;
         $a = '';
-
         if (isset($data->{'q'.$this->id})) {
             $mynumber = $data->{'q'.$this->id};
             if ($mynumber != '') {
@@ -1652,14 +1825,14 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                     $msg = get_string('notanumber', 'questionnaire', $mynumber);
                     questionnaire_notify ($msg);
                 } else {
-                    if($precision) {
+                    if ($precision) {
                         $pos = strpos($mynumber, '.');
                         if (!$pos) {
                             if (strlen($mynumber) > $this->length) {
                                 $mynumber = substr($mynumber, 0 , $this->length);
                             }
                         }
-                        $this->length += (1 + $precision); // to allow for n numbers after decimal point
+                        $this->length += (1 + $precision); // To allow for n numbers after decimal point.
                     }
                     $mynumber = number_format($mynumber, $precision , '.', '');
                     if ( $mynumber != $mynumber0) {
@@ -1675,33 +1848,19 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
             }
         }
 
-        echo '<input type="text" size="'.$this->length.'" name="q'.$this->id.'" maxlength="'.$this->length.
+        echo '<input onkeypress="return event.keyCode != 13;" type="text" size="'.$this->length.'" name="q'.$this->id.'" maxlength="'.$this->length.
              '" value="'.(isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} : '').
             '" id="' . $this->type . $this->id . '" />';
     }
 
-    function sectiontext_survey_display($data) {
-        echo '
-    <div class="questioncontainer">
-        <div class="qnOuter">
-            <table class="qnInnerTable" style="width:100%" cellpadding="10"  cellspacing="1">
-                <tr>
-                    <td class="qnInner" style="height:35px">' .
-                        format_text(file_rewrite_pluginfile_urls($this->content, 'pluginfile.php', $this->context->id,
-                                                             'mod_questionnaire', 'question', $this->id), FORMAT_HTML).'
-                    </td>
-                </tr>
-            </table>
-        </div>
-    </div>
-        ';
+    private function sectiontext_survey_display($data) {
+        return;
     }
 
-///***
-    function response_display($data, $qnum='') {
-        global $QTYPENAMES;
+    public function response_display($data, $qnum='') {
+        global $qtypenames;
+        $method = $qtypenames[$this->type_id].'_response_display';
 
-        $method = $QTYPENAMES[$this->type_id].'_response_display';
         if (method_exists($this, $method)) {
             $this->questionstart_survey_display($qnum, $data);
             $this->$method($data);
@@ -1711,7 +1870,7 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         }
     }
 
-    function yesno_response_display($data) {
+    public function yesno_response_display($data) {
         static $stryes = null;
         static $strno = null;
         static $uniquetag = 0;  // To make sure all radios have unique names.
@@ -1742,61 +1901,66 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         echo '</div>';
     }
 
-    function text_response_display($data) {
+    public function text_response_display($data) {
         $response = isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} : '';
         echo '<div class="response text"><span class="selected">'.$response.'</span></div>';
     }
 
-    function essay_response_display($data) {
+    public function essay_response_display($data) {
         echo '<div class="response text">';
         echo((!empty($data->{'q'.$this->id}) ? $data->{'q'.$this->id} : '&nbsp;'));
         echo '</div>';
     }
 
-    function radio_response_display($data) {
+    public function radio_response_display($data) {
         static $uniquetag = 0;  // To make sure all radios have unique names.
-
-        $currentradio = 0;
+        $horizontal = $this->length;
         $checked = (isset($data->{'q'.$this->id})?$data->{'q'.$this->id}:'');
-        echo '<div class="response radio">';
         foreach ($this->choices as $id => $choice) {
+            if ($horizontal) {
+                echo ' <span style="white-space:nowrap;">';
+            }
             if (strpos($choice->content, '!other') !== 0) {
                 $contents = questionnaire_choice_values($choice->content);
                 $choice->content = $contents->text.$contents->image;
                 if ($id == $checked) {
                     echo '<span class="selected">'.
                          '<input type="radio" name="'.$id.$uniquetag++.'" checked="checked" /> '.
-                         ($choice->content === '' ? $id : format_text($choice->content, FORMAT_HTML)).'</span><br />';
+                         ($choice->content === '' ? $id : format_text($choice->content, FORMAT_HTML)).'</span>&nbsp;';
                 } else {
                     echo '<span class="unselected">'.
-                         '<input type="radio" name="'.$id.$uniquetag++.'" onclick="this.checked=false;" /> '.
-                         ($choice->content === '' ? $id : format_text($choice->content, FORMAT_HTML)).'</span><br />';
+                         '<input type="radio" disabled="disabled" name="'.$id.$uniquetag++.'" onclick="this.checked=false;" /> '.
+                         ($choice->content === '' ? $id : format_text($choice->content, FORMAT_HTML)).'</span>&nbsp;';
                 }
-                $currentradio = ($currentradio + 1) % 2;
 
             } else {
-                $other_text = preg_replace(
-                        array("/^!other=/","/^!other/"),
+                $othertext = preg_replace(
+                        array("/^!other=/", "/^!other/"),
                         array('', get_string('other', 'questionnaire')),
                         $choice->content);
                 $cid = 'q'.$this->id.'_'.$id;
 
                 if (isset($data->{'q'.$this->id.'_'.$id})) {
                     echo '<span class="selected">'.
-                         '<input type="radio" name="'.$id.$uniquetag++.'" checked="checked" /> '.$other_text.' ';
+                         '<input type="radio" name="'.$id.$uniquetag++.'" checked="checked" /> '.$othertext.' ';
                     echo '<span class="response text">';
                     echo (!empty($data->$cid) ? htmlspecialchars($data->$cid) : '&nbsp;');
-                    echo '</span></span><br />';
+                    echo '</span></span>';
                 } else {
-                    echo '<span class="unselected"><input type="radio" name="'.$id.$uniquetag++.'" onclick="this.checked=false;" /> '.
-                         $other_text.'</span><br />';
+                    echo '<span class="unselected"><input type="radio" name="'.$id.$uniquetag++.
+                                    '" onclick="this.checked=false;" /> '.
+                         $othertext.'</span>';
                 }
             }
+            if ($horizontal) {
+                echo '</span>';
+            } else {
+                echo '<br />';
+            }
         }
-        echo '</div>';
     }
 
-    function check_response_display($data) {
+    public function check_response_display($data) {
         static $uniquetag = 0;  // To make sure all radios have unique names.
 
         if (!isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id})) {
@@ -1819,8 +1983,8 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                          ($choice->content === '' ? $id : format_text($choice->content, FORMAT_HTML)).'</span><br />';
                 }
             } else {
-                $other_text = preg_replace(
-                        array("/^!other=/","/^!other/U"),
+                $othertext = preg_replace(
+                        array("/^!other=/", "/^!other/U"),
                         array('', get_string('other', 'questionnaire')),
                         $choice->content);
                 $cid = 'q'.$this->id.'_'.$id;
@@ -1828,21 +1992,30 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                 if (isset($data->$cid)) {
                     echo '<span class="selected">'.
                          '<input type="checkbox" name="'.$id.$uniquetag++.'" checked="checked" onclick="this.checked=true;" /> '.
-                         ($other_text === '' ? $id : $other_text).' ';
+                         ($othertext === '' ? $id : $othertext).' ';
                     echo '<span class="response text">';
                     echo (!empty($data->$cid) ? htmlspecialchars($data->$cid) : '&nbsp;');
                     echo '</span></span><br />';
                 } else {
                     echo '<span class="unselected">'.
                          '<input type="checkbox" name="'.$id.$uniquetag++.'" onclick="this.checked=false;" /> '.
-                         ($other_text === '' ? $id : $other_text).'</span><br />';
+                         ($othertext === '' ? $id : $othertext).'</span><br />';
                 }
             }
         }
         echo '</div>';
     }
+       public function dbase_response_display($data) {
+        /* FPS single record  this is odd */
+        // print_r($data);
+        if (isset($data->{'q'.$this->id})) {
+            echo '<div class="response date">';
+            echo('<span class="selected">'.$data->{'q'.$this->id}.'</span>');
+            echo '</div>';
+        }
+    }
 
-    function drop_response_display($data) {
+    public function drop_response_display($data) {
         global $OUTPUT;
         static $uniquetag = 0;  // To make sure all radios have unique names.
 
@@ -1852,44 +2025,51 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
             $options[$id] = format_text($contents->text, FORMAT_HTML);
         }
         echo '<div class="response drop">';
-        echo html_writer::select($options, 'q'.$this->id.$uniquetag++, (isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} :''));
+        echo html_writer::select($options, 'q'.$this->id.$uniquetag++,
+                        (isset($data->{'q'.$this->id}) ? $data->{'q'.$this->id} :''));
         if (isset($data->{'q'.$this->id}) ) {
-           echo ': <span class="selected">'.$options[$data->{'q'.$this->id}].'</span></div>';
+            echo ': <span class="selected">'.$options[$data->{'q'.$this->id}].'</span></div>';
         }
     }
 
-    function rate_response_display($data) {
+    public function rate_response_display($data) {
         static $uniquetag = 0;  // To make sure all radios have unique names.
-
         if (!isset($data->{'q'.$this->id}) || !is_array($data->{'q'.$this->id})) {
             $data->{'q'.$this->id} = array();
         }
-
-        echo '<div class="response rate">';
-        echo '<table border="0" cellspacing="1" cellpadding="0">';
-        echo '<tbody><tr><td></td>';
-        $bg = 'qntype c0';
+        echo '<table class="individual" border="0" cellspacing="1" cellpadding="0">';
+        echo '<tbody><tr>';
         $osgood = false;
-        if ($this->precise == 3) { // Osgood's semantic differential
+        if ($this->precise == 3) { // Osgood's semantic differential.
             $osgood = true;
         }
+
+        if ($osgood) {
+            echo '<td style="width: 19%;"></td>';
+        } else {
+            echo '<td style="width: 29%"></td>';
+        }
+
+        $bg = 'c0';
         $nameddegrees = 0;
         $cidnamed = array();
         $n = array();
         foreach ($this->choices as $cid => $choice) {
             $content = $choice->content;
-             if (preg_match("/^[0-9]{1,3}=/", $content,$ndd)) {
+            if (preg_match("/^[0-9]{1,3}=/", $content, $ndd)) {
                 $n[$nameddegrees] = format_text(substr($content, strlen($ndd[0])), FORMAT_HTML);
                 $cidnamed[$cid] = true;
                 $nameddegrees++;
-             }
-        }
-        if ($nameddegrees && !$osgood) {
-            $colwidth = 80;
-        } else {
-            $colwidth = 40;
+            }
         }
 
+        if ($osgood) {
+            $colwidth = (60 / $this->length).'%';
+            $textalign = 'right';
+        } else {
+            $colwidth = (70 / $this->length).'%';
+            $textalign = 'left';
+        }
         for ($j = 0; $j < $this->length; $j++) {
             if (isset($n[$j])) {
                 $str = $n[$j];
@@ -1897,19 +2077,20 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                 $str = $j+1;
             }
             echo '<td style="width:'.$colwidth.'; text-align:center" class="'.$bg.'">'.$str.'</td>';
-            if ($bg == 'qntype c0') {
-                $bg = 'qntype c1';
+            if ($bg == 'c0') {
+                $bg = 'c1';
             } else {
-                $bg = 'qntype c0';
+                $bg = 'c0';
             }
         }
         if ($this->precise == 1) {
-            echo '<td style="width:'.$colwidth.'; text-align:center" class="'.$bg.'">'.get_string('notapplicable', 'questionnaire').'</td>';
+            echo '<td style="width:'.$colwidth.'; text-align:center" class="'.$bg.'">'.
+                get_string('notapplicable', 'questionnaire').'</td>';
         }
         echo '</tr>';
 
         foreach ($this->choices as $cid => $choice) {
-            // do not print column names if named column exist
+            // Do not print column names if named column exist.
             if (!array_key_exists($cid, $cidnamed)) {
                 $str = 'q'."{$this->id}_$cid";
                 echo '<tr>';
@@ -1921,28 +2102,32 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                 if ($osgood) {
                     list($content, $contentright) = preg_split('/[|]/', $content);
                 }
-                echo '<td align="left">'.format_text($content, FORMAT_HTML).'&nbsp;</td>';
-                $bg = 'qntype c0';
+                echo '<td style="text-align:left">'.format_text($content, FORMAT_HTML).'&nbsp;</td>';
+                $bg = 'c0';
                 for ($j = 0; $j < $this->length; $j++) {
                     $checked = ((isset($data->$str) && ($j == $data->$str)) ? ' checked="checked"' : '');
-                    $checkedna = ((isset($data->$str) && ($data->$str == -1)) ? ' checked="checked"' : ''); // N/A column checked
-                    echo '<td style="width:40; text-align:center;" class="'.$bg.'">';
+                    // N/A column checked.
+                    $checkedna = ((isset($data->$str) && ($data->$str == -1)) ? ' checked="checked"' : '');
+
                     if ($checked) {
+                        echo '<td style="text-align:center;" class="selected">';
                         echo '<span class="selected">'.
                              '<input type="radio" name="'.$str.$j.$uniquetag++.'" checked="checked" /></span>';
                     } else {
+                        echo '<td style="text-align:center;" class="'.$bg.'">';
                             echo '<span class="unselected">'.
-                                 '<input type="radio" name="'.$str.$j.$uniquetag++.'" onclick="this.checked=false;" /></span>';
+                                 '<input type="radio" disabled="disabled" name="'.$str.$j.
+                                    $uniquetag++.'" onclick="this.checked=false;" /></span>';
                     }
                     echo '</td>';
-                    if ($bg == 'qntype c0') {
-                        $bg = 'qntype c1';
+                    if ($bg == 'c0') {
+                        $bg = 'c1';
                     } else {
-                        $bg = 'qntype c0';
+                        $bg = 'c0';
                     }
                 }
-                if ($this->precise == 1) { // N/A column
-                    echo '<td style="width:40; text-align:center;" class="'.$bg.'">';
+                if ($this->precise == 1) { // N/A column.
+                    echo '<td style="width:auto; text-align:center;" class="'.$bg.'">';
                     if ($checkedna) {
                         echo '<span class="selected">'.
                              '<input type="radio" name="'.$str.$j.$uniquetag++.'na" checked="checked" /></span>';
@@ -1955,14 +2140,13 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                 if ($osgood) {
                     echo '<td>&nbsp;'.format_text($contentright, FORMAT_HTML).'</td>';
                 }
-
-            echo '</tr>';
+                echo '</tr>';
             }
         }
-        echo '</tbody></table></div>';
+        echo '</tbody></table>';
     }
 
-    function date_response_display($data) {
+    public function date_response_display($data) {
         if (isset($data->{'q'.$this->id})) {
             echo '<div class="response date">';
             echo('<span class="selected">'.$data->{'q'.$this->id}.'</span>');
@@ -1970,18 +2154,9 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         }
     }
 
-    function dbase_response_display($data) {
-	/* FPS single record */
-        if (isset($data->{'q'.$this->id})) {
-            echo '<div class="response data">';
-            echo('<span class="selected">'.$data->{'q'.$this->id}.'</span>');
-            echo '</div>';
-        }
-    }
- 
-    function numeric_response_display($data) {
-        $this->length++; // for sign
-        if($this->precise) {
+    public function numeric_response_display($data) {
+        $this->length++; // For sign.
+        if ($this->precise) {
             $this->length += 1 + $this->precise;
         }
         echo '<div class="response numeric">';
@@ -1991,46 +2166,28 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         echo '</div>';
     }
 
-    function sectiontext_response_display($data) {
-        echo '
-    <div class="questioncontainer">
-        <div class="qnOuter">
-            <table class="qnInnerTable" style="width:100%" cellpadding="10"  cellspacing="1">
-                <tr>
-                    <td class="qnInnerTd" style="vertical-align:top;">&nbsp;</td>
-                    <td class="qnInner" style="height:35px">' .
-                    $this->content.'
-                    </td>
-                </tr>
-            </table>
-        </div>
-    </div>
-        ';
+    public function sectiontext_response_display($data) {
+        return;
     }
-///****
 
     /* {{{ proto void mkrespercent(array weights, int total, int precision, bool show_totals)
       Builds HTML showing PERCENTAGE results. */
-    function mkrespercent($total, $precision, $showTotals, $guicross=false, $sort) {
+
+    private function mkrespercent($total, $precision, $showtotals, $sort) {
         global $CFG, $OUTPUT;
         $precision = 0;
         $i=0;
         $alt = '';
         $bg='';
-        $image_url = $CFG->wwwroot.'/mod/questionnaire/images/';
+        $imageurl = $CFG->wwwroot.'/mod/questionnaire/images/';
         $strtotal = get_string('total', 'questionnaire');
         $table = new html_table();
         $table->size = array();
+
         $table->align = array();
         $table->head = array();
         $table->wrap = array();
-        if ($guicross) {
-            $table->size[] = '34';
-            $table->align[] = 'center';
-            $table->head[] = ' ';
-            $table->wrap[] = '';
-        }
-        $table->size = array_merge($table->size, array('*', '50%', '7%'));
+        $table->size = array_merge($table->size, array('50%', '40%', '10%'));
         $table->align = array_merge($table->align, array('left', 'left', 'right'));
         $table->wrap = array_merge($table->wrap, array('', 'nowrap', ''));
         $table->head = array_merge($table->head, array(get_string('response', 'questionnaire'),
@@ -2039,79 +2196,73 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         if (!empty($this->counts) && is_array($this->counts)) {
             $pos = 0;
             switch ($sort) {
-            case 'ascending':
-                asort($this->counts);
-                break;
-            case 'descending':
-                arsort($this->counts);
-                break;
+                case 'ascending':
+                    asort($this->counts);
+                    break;
+                case 'descending':
+                    arsort($this->counts);
+                    break;
             }
-            $numresponses = 0; //devjr
+            $numresponses = 0;
             foreach ($this->counts as $key => $value) {
                 $numresponses = $numresponses + $value;
             }
             reset ($this->counts);
-            while(list($content,$num) = each($this->counts)) {
-                if($num>0) { $percent = $num/$numresponses*100.0; } //devjr
-                else { $percent = 0; }
-                if($percent > 100) {
+            while (list($content, $num) = each($this->counts)) {
+                if ($num>0) {
+                    $percent = $num/$numresponses*100.0;
+                } else {
+                    $percent = 0;
+                }
+                if ($percent > 100) {
                     $percent = 100;
                 }
                 if ($num) {
-                    $out = '&nbsp;<img alt="'.$alt.'" src="'.$image_url.'hbar_l.gif" height="9" width="4" />'.
-                           sprintf('<img alt="'.$alt.'" src="'.$image_url.'hbar.gif" height="9" width="%d" />', $percent*4).
-                           '<img alt="'.$alt.'" src="'.$image_url.'hbar_r.gif" height="9" width="4" />'.
-                           sprintf('&nbsp;%.'.$precision.'f%%', $percent);
+                    $out = '&nbsp;<img alt="'.$alt.'" src="'.$imageurl.'hbar_l.gif" />'.
+                               '<img style="height:9px; width:'.($percent*1.4).'px;" alt="'.$alt.'" src="'.
+                               $imageurl.'hbar.gif" />'.'<img alt="'.$alt.'" src="'.$imageurl.'hbar_r.gif" />'.
+                               sprintf('&nbsp;%.'.$precision.'f%%', $percent);
                 } else {
                     $out = '';
                 }
+
                 $tabledata = array();
-                if ($guicross) {
-                    $tabledata[] = $this->mkcrossformat($pos, $this->id, $this->type_id);
-                }
                 $tabledata = array_merge($tabledata, array(format_text($content, FORMAT_HTML), $out, $num));
                 $table->data[] = $tabledata;
                 $i += $num;
                 $pos++;
-            } // end while
+            } // End while.
 
-            if($showTotals) {
-                if($i>0) { $percent = $i/$total*100.0; }
-                else { $percent = 0; }
-                if($percent > 100) {
+            if ($showtotals) {
+                if ($i>0) {
+                    $percent = $i/$total*100.0;
+                } else {
+                    $percent = 0;
+                }
+                if ($percent > 100) {
                     $percent = 100;
                 }
 
-                $out = '&nbsp;<img alt="'.$alt.'" src="'.$image_url.'thbar_l.gif" height="9" width="4" />'.
-                       sprintf('<img alt="'.$alt.'" src="'.$image_url.'thbar.gif" height="9" width="%d" />', $percent*4).
-                       '<img alt="'.$alt.'" src="'.$image_url.'thbar_r.gif" height="9" width="4" />'.
-                       sprintf('&nbsp;%.'.$precision.'f%%', $percent);
+                $out = '&nbsp;<img alt="'.$alt.'" src="'.$imageurl.'thbar_l.gif" />'.
+                                '<img style="height:9px;  width:'.($percent*1.4).'px;" alt="'.$alt.'" src="'.
+                                $imageurl.'thbar.gif" />'.'<img alt="'.$alt.'" src="'.$imageurl.'thbar_r.gif" />'.
+                                sprintf('&nbsp;%.'.$precision.'f%%', $percent);
                 $table->data[] = 'hr';
                 $tabledata = array();
-                if ($guicross) {
-                    $tabledata[] = ' ';
-                }
                 $tabledata = array_merge($tabledata, array($strtotal, $out, "$i/$total"));
                 $table->data[] = $tabledata;
             }
         } else {
             $tabledata = array();
-            if ($guicross) {
-                $tabledata[] = ' ';
-            }
             $tabledata = array_merge($tabledata, array('', get_string('noresponsedata', 'questionnaire')));
             $table->data[] = $tabledata;
         }
 
         echo html_writer::table($table);
     }
-
-    /* {{{ proto void mkreslist(array weights, int total, int precision, bool show_totals)
-        Builds HTML showing LIST results. */
-    function mkreslist($total, $precision, $showTotals) {
+      private function mkreslistdata($total, $precision, $showtotals) {
         global $CFG, $OUTPUT;
-
-        if($total == 0) {
+      if ($total == 0) {
             return;
         }
 
@@ -2120,13 +2271,13 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         $table = new html_table();
         $table->align = array('left', 'left');
 
-        $image_url = $CFG->wwwroot.'/mod/questionnaire/images/';
+        $imageurl = $CFG->wwwroot.'/mod/questionnaire/images/';
 
         $table->head = array($strnum, $strresponse);
         $table->size = array('10%', '*');
 
         if (!empty($this->counts) && is_array($this->counts)) {
-            while(list($text,$num) = each($this->counts)) {
+            while (list($text, $num) = each($this->counts)) {
                 $text = format_text($text, FORMAT_HTML);
                 $table->data[] = array($num, $text);
             }
@@ -2137,24 +2288,28 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         echo html_writer::table($table);
     }
 
-    function mkreslistdate($total, $precision, $showTotals) {
+    /* {{{ proto void mkreslist(array weights, int total, int precision, bool show_totals)
+        Builds HTML showing LIST results. */
+    private function mkreslist($total, $precision, $showtotals) {
         global $CFG, $OUTPUT;
-        $dateformat = get_string('strfdate', 'questionnaire');
 
-        if($total == 0) {
+        if ($total == 0) {
             return;
         }
+
         $strresponse = get_string('response', 'questionnaire');
         $strnum = get_string('num', 'questionnaire');
         $table = new html_table();
-        $table->align = array('left', 'right');
-        $table->head = array($strnum, $strresponse,'');
-        $table->size = array('10%', '15%', '*');
+        $table->align = array('left', 'left');
+
+        $imageurl = $CFG->wwwroot.'/mod/questionnaire/images/';
+
+        $table->head = array($strnum, $strresponse);
+        $table->size = array('10%', '*');
 
         if (!empty($this->counts) && is_array($this->counts)) {
-            ksort ($this->counts); // sort dates into chronological order
-            while(list($text,$num) = each($this->counts)) {
-                $text = userdate ( $text, $dateformat, '', false);    // change timestamp into readable dates
+            while (list($text, $num) = each($this->counts)) {
+                $text = format_text($text, FORMAT_HTML);
                 $table->data[] = array($num, $text);
             }
         } else {
@@ -2164,9 +2319,78 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         echo html_writer::table($table);
     }
 
-    function mkreslistnumeric($total, $precision) {
+    private function mkreslisttext($rows) {
+        global $CFG, $SESSION, $questionnaire, $OUTPUT;
+        $strresponse = get_string('response', 'questionnaire');
+        $viewsingleresponse = $questionnaire->capabilities->viewsingleresponse;
+        $nonanonymous = $questionnaire->respondenttype != 'anonymous';
+        $table = new html_table();
+        if ($viewsingleresponse && $nonanonymous) {
+            $strrespondent = get_string('respondent', 'questionnaire');
+            $table->align = array('left', 'left');
+            $currentgroupid = '';
+            if (isset($SESSION->questionnaire->currentgroupid)) {
+                $currentgroupid = $SESSION->questionnaire->currentgroupid;
+            }
+            $url = $CFG->wwwroot.'/mod/questionnaire/report.php?action=vresp&amp;sid='.$questionnaire->survey->id.
+            '&currentgroupid='.$currentgroupid;
+            $table->head = array($strrespondent, $strresponse);
+            $table->size = array('*', '*');
+        } else {
+            $table->align = array('left');
+            $table->head = array($strresponse);
+            $table->size = array('*');
+        }
+        $username = '';
+        foreach ($rows as $row) {
+            $text = format_text($row->response, FORMAT_HTML);
+            if ($viewsingleresponse && $nonanonymous) {
+                $rurl = $url.'&amp;rid='.$row->rid.'&amp;individualresponse=1';
+                $title = userdate($row->submitted);
+                $username = $row->username;
+                $user = new stdClass();
+                $user->firstname = $row->firstname;
+                $user->lastname = $row->lastname;
+                $rusername = '<a href="'.$rurl.'" title="'.$title.'">'.fullname($user).'</a>';
+                $table->data[] = array($rusername, $text);
+            } else {
+                $table->data[] = array($text);
+            }
+        }
+        echo html_writer::table($table);
+    }
+
+    private function mkreslistdate($total, $precision, $showtotals) {
         global $CFG, $OUTPUT;
-        if($total == 0) {
+        $dateformat = get_string('strfdate', 'questionnaire');
+
+        if ($total == 0) {
+            return;
+        }
+        $strresponse = get_string('response', 'questionnaire');
+        $strnum = get_string('num', 'questionnaire');
+        $table = new html_table();
+        $table->align = array('left', 'right');
+        $table->head = array($strnum, $strresponse);
+        $table->size = array('*', '*');
+        $table->attributes['class'] = 'generaltable';
+
+        if (!empty($this->counts) && is_array($this->counts)) {
+            ksort ($this->counts); // Sort dates into chronological order.
+            while (list($text, $num) = each($this->counts)) {
+                $text = userdate ( $text, $dateformat, '', false);    // Change timestamp into readable dates.
+                $table->data[] = array($num, $text);
+            }
+        } else {
+            $table->data[] = array('', get_string('noresponsedata', 'questionnaire'));
+        }
+
+        echo html_writer::table($table);
+    }
+
+    private function mkreslistnumeric($total, $precision) {
+        global $CFG, $OUTPUT;
+        if ($total == 0) {
             return;
         }
         $nbresponses = 0;
@@ -2178,18 +2402,19 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         $straverage = get_string('average', 'questionnaire');
         $table = new html_table();
         $table->align = array('left', 'right');
-        $table->head = array($strnum, $strresponse,'');
-        $table->size = array('10%', '15%','*');
+        $table->head = array($strnum, $strresponse);
+        $table->size = array('*', '*');
+        $table->attributes['class'] = 'generaltable';
 
         if (!empty($this->counts) && is_array($this->counts)) {
             ksort ($this->counts);
-            while(list($text,$num) = each($this->counts)) {
+            while (list($text, $num) = each($this->counts)) {
                 $table->data[] = array($num, $text);
                 $nbresponses += $num;
                 $sum += $text * $num;
             }
             $table->data[] = 'hr';
-               $table->data[] = array($strtotal , $sum);
+            $table->data[] = array($strtotal , $sum);
             $avg = $sum/$nbresponses;
                $table->data[] = array($straverage , sprintf('%.'.$precision.'f', $avg));
         } else {
@@ -2201,59 +2426,67 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
 
     /* {{{ proto void mkresavg(array weights, int total, int precision, bool show_totals)
         Builds HTML showing AVG results. */
-    function mkresavg($total, $precision, $showTotals, $length, $sort) {
+
+    private function mkresavg($total, $precision, $showtotals, $length, $sort, $stravgvalue='') {
         global $CFG, $OUTPUT;
-        $stravg = '<div style="text-align:center">'.get_string('averagerank', 'questionnaire').'</div>';
+        $stravgrank = get_string('averagerank', 'questionnaire');
+        $osgood = false;
+        if ($precision == 3) { // Osgood's semantic differential.
+            $osgood = true;
+            $stravgrank = get_string('averageposition', 'questionnaire');
+        }
+        $stravg = '<div style="text-align:right">'.$stravgrank.$stravgvalue.'</div>';
+
         $isna = $this->precise == 1;
         $isnahead = '';
-        $osgood = false;
         $nbchoices = count ($this->counts);
-        if ($precision == 3) { // Osgood's semantic differential
-            $osgood = true;
-        }
         $isrestricted = ($length < $nbchoices) && $precision == 2;
 
         if ($isna) {
-            $isnahead = get_string('notapplicable', 'questionnaire').'<br />(#)';
+            $isnahead = get_string('notapplicable', 'questionnaire');
         }
         $table = new html_table();
 
-        $table->align = array('', 'left', 'right', 'center');
+        $table->align = array('', '', 'center', 'right');
+
         if ($isna) {
-            $table->head = array('', $stravg, '',$isnahead);
-        }  else {
+            $table->head = array('', $stravg, '&dArr;', $isnahead);
+        } else {
             if ($osgood) {
-                $table->head = array('', $stravg, '', '');
-            } else {
+                $stravg = '<div style="text-align:center">'.$stravgrank.'</div>';
                 $table->head = array('', $stravg, '');
+            } else {
+                $table->head = array('', $stravg, '&dArr;');
             }
         }
-        if (!$osgood) {
-            $rightcolwidth = '5%';
-        } else {
-            $rightcolwidth = '25%';
+        $rightcolwidth = '5%';
+        $table->size = array('*', '*', $rightcolwidth);
+        if ($isna) {
+            $table->size = array('*', '*', $rightcolwidth, $rightcolwidth);
         }
-        $table->size = array('*', '40%', $rightcolwidth,'5%');
+        if ($osgood) {
+            $table->size = array('25', '50%', '25%');
+        }
 
-        $image_url = $CFG->wwwroot.'/mod/questionnaire/images/';
+        $imageurl = $CFG->wwwroot.'/mod/questionnaire/images/';
         if (!$length) {
             $length = 5;
         }
-        // add an extra column to accomodate lower ranks in this case
+        // Add an extra column to accomodate lower ranks in this case.
         $length += $isrestricted;
         $nacol = 0;
-        $width = 100 / $length ;
+        $width = 100 / $length;
         $n = array();
         $nameddegrees = 0;
         foreach ($this->choices as $choice) {
-            // to take into account languages filter
+            // To take into account languages filter.
             $content = (format_text($choice->content, FORMAT_HTML));
-            if (preg_match("/^[0-9]{1,3}=/", $content,$ndd)) {
+            if (preg_match("/^[0-9]{1,3}=/", $content, $ndd)) {
                 $n[$nameddegrees] = substr($content, strlen($ndd[0]));
                 $nameddegrees++;
             }
         }
-        $align = 'center';
+        $nbchoices = $this->length;
         for ($j = 0; $j < $this->length; $j++) {
             if (isset($n[$j])) {
                 $str = $n[$j];
@@ -2271,10 +2504,11 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
             if ($isrestricted && $i == $length - 1) {
                 $str = "...";
             }
-            $out .= '<td align = "center" style="width:'.$width.'%" >'.$str.'</td>';
+            $out .= '<td style="text-align: center; width:'.$width.'%" >'.$str.'</td>';
         }
         $out .= '</tr></table>';
         $table->data[] = array('', $out, '');
+
         switch ($sort) {
             case 'ascending':
                 uasort($this->counts, 'sortavgasc');
@@ -2286,24 +2520,28 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
         reset ($this->counts);
 
         if (!empty($this->counts) && is_array($this->counts)) {
-            while(list($content) = each($this->counts)) {
-                // eliminate potential named degrees on Likert scale
-                 if (!preg_match("/^[0-9]{1,3}=/", $content)) {
+            while (list($content) = each($this->counts)) {
+                // Eliminate potential named degrees on Likert scale.
+                if (!preg_match("/^[0-9]{1,3}=/", $content)) {
+
                     if (isset($this->counts[$content]->avg)) {
                         $avg = $this->counts[$content]->avg;
+                        if (isset($this->counts[$content]->avgvalue)) {
+                            $avgvalue = $this->counts[$content]->avgvalue;
+                        } else {
+                            $avgvalue = '';
+                        }
                     } else {
                         $avg = '';
                     }
                     $nbna = $this->counts[$content]->nbna;
-
-                    if($avg) {
+                    if ($avg) {
                         $out = '';
                         if (($j = $avg * $width) > 0) {
-                            $interval = 50 / $length;
-                            $out .= sprintf('<img alt="" src="'.$image_url.
-                                'rhbar.gif" height="0" width="%d%%" style="visibility:hidden" />', $j - $interval - 0.3);
+                            $marginposition = ($avg - 0.5 ) / ($this->length + $isrestricted) * 100;
                         }
-                        $out .= '<img alt="" src="'.$image_url.'rhbar.gif" height="12" width="6" />';
+                        $out .= '<img style="height:12px; width: 6px; margin-left: '.$marginposition.
+                            '%;" alt="" src="'.$imageurl.'hbar.gif" />';
                     } else {
                             $out = '';
                     }
@@ -2316,181 +2554,254 @@ if (isset( $data->{'q'.$this->id.'_'.$result->id.'_'.$j})) {
                             $content = $contents->text;
                         }
                     }
-                    if (!$isna) {
-                        if ($osgood) {
-                            $table->data[] = array('<div class="mdl-right">'.format_text($content, FORMAT_HTML).'</div>', $out,
-                                '<div class="mdl-left">'.format_text($contentright, FORMAT_HTML).'</div>', sprintf('%.1f', $avg));
-                        } else {
-                            if($avg) {
-                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, sprintf('%.1f', $avg));
-                            } else {
-                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, get_string('notapplicable', 'questionnaire'));
-                            }
-                        }
+                    if ($osgood) {
+                        $table->data[] = array('<div class="mdl-right">'.format_text($content, FORMAT_HTML).'</div>', $out,
+                            '<div class="mdl-left">'.format_text($contentright, FORMAT_HTML).'</div>');
+                        // JR JUNE 2012 do not display meaningless average rank values for Osgood.
                     } else {
                         if ($avg) {
-                            $avg = sprintf('%.1f', $avg);
+                            $stravgval = '';
+                            if ($stravgvalue) {
+                                $stravgval = '('.sprintf('%.1f', $avgvalue).')';
+                            }
+                            if ($isna) {
+                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, sprintf('%.1f', $avg).
+                                        '&nbsp;'.$stravgval, $nbna);
+                            } else {
+                                $table->data[] = array(format_text($content, FORMAT_HTML), $out, sprintf('%.1f', $avg).
+                                        '&nbsp;'.$stravgval);
+                            }
+                        } else {
+                            $table->data[] = array(format_text($content, FORMAT_HTML), $out,
+                                            get_string('notapplicable', 'questionnaire'));
                         }
-                        $table->data[] = array(format_text($content, FORMAT_HTML), $out, $avg, $nbna);
                     }
-                } // end if named degrees
-            } // end while
+                } // End if named degrees.
+            } // End while.
         } else {
             $table->data[] = array('', get_string('noresponsedata', 'questionnaire'));
         }
         echo html_writer::table($table);
     }
 
-    /* {{{ proto void mkresrank(array weights, int total, int precision, bool show_totals)
-       Builds HTML showing RANK results. */
-    function mkresrank($total, $precision, $showTotals) {
-        global $CFG;
+    private function mkrescount($rids, $rows, $precision, $length, $sort) {
+        // Display number of responses to Rate questions - see http://moodle.org/mod/forum/discuss.php?d=185106.
+        global $CFG, $DB;
+        $nbresponses = count($rids);
+        // Prepare data to be displayed.
+        $isrestricted = ($this->length < count($this->choices)) && $this->precise == 2;
+        $ridstr = '';
+        if (is_array($rids)) {
+            foreach ($rids as $rid) {
+                $ridstr .= (empty($ridstr) ? ' AND response_id IN ('.$rid : ', '.$rid);
+            }
+            $ridstr .= ') ';
+        } else if (is_int($rids)) {
+            $ridstr = ' AND response_id = '.$rids.' ';
+        }
+        $questionid = $this->id;
+        $sql = 'SELECT r.id, c.content, r.rank, c.id AS choiceid '.
+                'FROM {questionnaire_quest_choice} c , 
+                {questionnaire_response_rank} r '.
+                'WHERE c.question_id = '.$questionid.
+                ' AND r.question_id = c.question_id'.
+                ' AND r.choice_id = c.id '.
+                $ridstr.
+                ' ORDER BY choiceid, rank ASC';
+        $choices = $DB->get_records_sql($sql);
 
-        $bg='';
-        $image_url = $CFG->wwwroot.'/mod/questionnaire/images/';
-    ?>
-    <table border="0">
-        <tr>
-            <td align="right"><b><?php print_string('rank', 'questionnaire'); ?></b></td>
-            <td>&nbsp;</td>
-            <td>&nbsp;</td>
-            <td>&nbsp;</td>
-        </tr>
-    <?php
-        arsort($this->counts);
-        $i=0; $pt=0;
-        while(list($content,$num) = each($this->counts)) {
-            if($num)
-                $p = $num/$total*100.0;
-            else
-                $p = 0;
-            $pt += $p;
-
-            if($bg != QUESTIONNAIRE_BGALT_COLOR1)
-                $bg = QUESTIONNAIRE_BGALT_COLOR1;
-            else
-                $bg = QUESTIONNAIRE_BGALT_COLOR2;
-    ?>
-            <td><?php echo($content); ?></td>
-            <td align="right" width="60"><?php if($p) printf("%.${precision}f%%",$p); ?></td>
-            <td align="right" width="60">(<?php echo($num); ?>)</td>
-        </tr>
-    <?php
-        } // end while
-        if($showTotals) {
-            if($bg != QUESTIONNAIRE_BGALT_COLOR1)
-                $bg = QUESTIONNAIRE_BGALT_COLOR1;
-            else
-                $bg = QUESTIONNAIRE_BGALT_COLOR2;
-    ?>
-            <td colspan=2 align="left"><b><?php print_string('total', 'questionnaire'); ?></b></td>
-            <td align="right"><b><?php printf("%.${precision}f%%",$pt); ?></b></td>
-            <td align="right"><b><?php echo($total); ?></b></td>
-        </tr>
-    <?php } ?>
-    </table>
-    <?php
-    }
-
-    function mkcrossformat($pos, $qid, $tid) {
-        global $DB;
-
-        $cids = array();
-        $cidCount = 0;
-
-        // let's grab the cid values for each of the questions
-        // that we allow cross analysis on.
-        if ($tid == 1) {
-            $cids = array('y', 'n');
-        } else if ($records = $DB->get_records('questionnaire_quest_choice', array('question_id' => $qid), 'id')) {
-            foreach ($records as $record) {
-                array_push($cids, $record->id);
+        // Sort rows (results) by average value.
+        if ($sort != 'default') {
+            $sortarray = array();
+            foreach ($rows as $row) {
+                foreach ($row as $key => $value) {
+                    if (!isset($sortarray[$key])) {
+                        $sortarray[$key] = array();
+                    }
+                    $sortarray[$key][] = $value;
+                }
+            }
+            $orderby = "average";
+            switch ($sort) {
+                case 'ascending':
+                    array_multisort($sortarray[$orderby], SORT_ASC, $rows);
+                    break;
+                case 'descending':
+                    array_multisort($sortarray[$orderby], SORT_DESC, $rows);
+                    break;
+            }
+        }
+        $nbranks = $this->length;
+        $ranks = array();
+        foreach ($rows as $row) {
+            $choiceid = $row->id;
+            foreach ($choices as $choice) {
+                if ($choice->choiceid == $choiceid) {
+                    $n = 0;
+                    for ($i=0; $i<$nbranks; $i++) {
+                        if ($choice->rank == $i) {
+                            $n++;
+                            if (!isset($ranks[$choice->content][$i])) {
+                                $ranks[$choice->content][$i] = 0;
+                            }
+                            $ranks[$choice->content][$i] += $n;
+                        }
+                    }
+                }
             }
         }
 
-        $bg = QUESTIONNAIRE_BGALT_COLOR1;
-        $output = '';
-        if ($pos >= count($cids)) {
-            $pos = count($cids) - 1;
+        // Psettings for display.
+        $strresp = '<div style="text-align:center">'.get_string('responses', 'questionnaire').'</div>';
+        $strtotal = '<strong>'.get_string('total', 'questionnaire').'</strong>';
+        $isna = $this->precise == 1;
+        $isnahead = '';
+        $osgood = false;
+        $nbchoices = count ($this->counts);
+        if ($precision == 3) { // Osgood's semantic differential.
+            $osgood = true;
         }
-        $output .= '<input type="checkbox" name="cids[]" value="'.$cids[$pos].'" />';
-        return $output;
+        if ($isna) {
+            $isnahead = get_string('notapplicable', 'questionnaire').'<br />(#)';
+        }
+        if ($precision == 1) {
+            $na = get_string('notapplicable', 'questionnaire');
+        } else {
+            $na = '';
+        }
+        $colspan = $length + 1 + ($na !='') + $osgood;
+        $nameddegrees = 0;
+        $n = array();
+        $mods = array();
+        foreach ($this->choices as $cid => $choice) {
+            $content = $choice->content;
+            // Check for number from 1 to 3 digits, followed by the equal sign = (to accomodate named degrees).
+            if (preg_match("/^([0-9]{1,3})=(.*)$/", $content, $ndd)) {
+                $n[$nameddegrees] = format_text($ndd[2], FORMAT_HTML);
+                $nameddegrees++;
+            } else {
+                $contents = questionnaire_choice_values($content);
+                if ($contents->modname) {
+                    $choice->content = $contents->text;
+                }
+            }
+        }
+
+        $headings = array(get_string('responses', 'questionnaire'));
+        if ($osgood) {
+            $align = array('right');
+        } else {
+            $align = array('left');
+        }
+
+        // Display the column titles.
+        for ($j = 0; $j < $this->length; $j++) {
+            if (isset($n[$j])) {
+                $str = $n[$j];
+            } else {
+                $str = $j+1;
+            }
+            array_push($headings, $str);
+            array_push($align, 'center');
+        }
+        if ($osgood) {
+            array_push($headings, '');
+            array_push($align, 'left');
+        }
+        array_push($headings, $strtotal);
+        if ($isrestricted) {
+            array_push($headings, get_string('notapplicable', 'questionnaire'));
+            array_push($align, 'center');
+        }
+        array_push($align, 'center');
+        if ($na) {
+            array_push($headings, $na);
+            array_push($align, 'center');
+        }
+
+        $table = new html_table();
+        $table->head = $headings;
+        $table->align = $align;
+        $table->attributes['class'] = 'generaltable';
+        // Now display the responses.
+        foreach ($ranks as $content => $rank) {
+            $data = array();
+            // Eliminate potential named degrees on Likert scale.
+            if (!preg_match("/^[0-9]{1,3}=/", $content)) {
+                // First display the list of degrees (named or un-named)
+                // number of NOT AVAILABLE responses for this possible answer.
+                $nbna = $this->counts[$content]->nbna;
+                // TOTAL number of responses for this possible answer.
+                $total = $this->counts[$content]->num;
+                $nbresp = '<strong>'.$total.'<strong>';
+                if ($osgood) {
+                    list($content, $contentright) = preg_split('/[|]/', $content);
+                    $data[] = format_text($content, FORMAT_HTML);
+                } else {
+                    // Eliminate potentially short-named choices.
+                    $contents = questionnaire_choice_values($content);
+                    if ($contents->modname) {
+                        $content = $contents->text;
+                    }
+                    $data[] = format_text($content, FORMAT_HTML);
+                }
+                // Display ranks/rates numbers.
+                $maxrank = max($rank);
+                for ($i = 0; $i <= $length - 1; $i++) {
+                    $percent = '';
+                    if (isset($rank[$i])) {
+                        $str = $rank[$i];
+                        if ($total !== 0 && $str !==0) {
+                            $percent = ' (<span class="percent">'.number_format(($str * 100) / $total).'%</span>)';
+                        }
+                        // Emphasize responses with max rank value.
+                        if ($str == $maxrank) {
+                            $str = '<strong>'.$str.'</strong>';
+                        }
+                    } else {
+                        $str = 0;
+                    }
+                    $data[] = $str.$percent;
+                }
+                if ($osgood) {
+                    $data[] = format_text($contentright, FORMAT_HTML);
+                }
+                $data[] = $nbresp;
+                if ($isrestricted) {
+                    $data[] = $nbresponses - $total;
+                }
+                if (!$osgood) {
+                    if ($na) {
+                        $data[] = $nbna;
+                    }
+                }
+            } // End named degrees.
+            $table->data[] = $data;
+        }
+        echo html_writer::table($table);
     }
 }
+
 function sortavgasc($a, $b) {
     if (isset($a->avg) && isset($b->avg)) {
         if ( $a->avg < $b->avg ) {
             return -1;
-        } elseif ( $a->avg > $b->avg ) {
+        } else if ($a->avg > $b->avg ) {
             return 1;
         } else {
             return 0;
         }
     }
 }
+
 function sortavgdesc($a, $b) {
     if (isset($a->avg) && isset($b->avg)) {
         if ( $a->avg > $b->avg ) {
             return -1;
-        } elseif ( $a->avg < $b->avg ) {
+        } else if ($a->avg < $b->avg) {
             return 1;
         } else {
             return 0;
         }
     }
 }
-/*
-          //Update formdata structure
- 		$formdata->{'q'.$this->id} = $content;
-//FPS data strucutre
-*/
-function data_screen($thistype,$thisid,$result,$count,$setter) {
- $myEntries = array();
- $myHeader = array();
- $object = array();
-		$myHeader[] =  "<td>".$result->description ."</td>";
-            switch ($result->type) {
-            case 'menu' :
-		$myMenu='';
-		 foreach (explode("\n",$result->param1 ) as $answer)
-        	{
-		 $object[]=$answer;
-		}
-                $myMenu .= html_writer::select($object, 'q'.$thisid.'_'.$result->id.'_'.$count, (isset($setter)?$setter:''), array(''=>'choosedots'), array('id' => $thistype . $thisid));
-			$myEntries[] = "<td>".$myMenu."</td>";
-                break;
-            case 'checkbox':
-		$myChecks='';
-		$id=1;
-		 foreach (explode("\n",$result->param1 ) as $answer)
-        	{
-
-if (isset( $data->{'q'.$thisid.'_'.$result->id.'_'.$id})) {
-               $myChecks .= html_writer::checkbox('q'.$thisid.'_'.$result->id.'_'.$count.'[]', $id, in_array($id, $data->{'q'.$thisid.'_'.$result->id.'_'.$count}), format_text($answer, FORMAT_HTML)).'<br>';
-                //echo html_writer::checkbox($name, $value, $checked, format_text($other_text.'', FORMAT_HTML));
-} else{ 
-               $myChecks .= html_writer::checkbox('q'.$thisid.'_'.$result->id.'_'.$count.'[]', $id,false , format_text($answer, FORMAT_HTML)).'<br>';
-}
-                 //                          format_text($contents->text, FORMAT_HTML).$contents->image);
-		$id++;
-		}
-			$myEntries[] = "<td>".$myChecks."</td>";
-                break;
-            case 'textarea':
-		$myEntries[]= '<td><div class="qn-type"><textarea class="form-textarea" id="edit-q'.$thisid.'_'.$count.'" name="q'.$thisid.'_'.$result->id.'_'.$count.'" rows="5" cols="60">YYY</textarea></div></fieldset></td>';
-                break;
-            case 'text':
-                $other_text = '&nbsp;<input type="text" size="25" name="q'.$thisid.'_'.$result->id.'_'.$count.'"  id="q'.$thisid.'_'.$result->id.'_'.$count.'"';
-                if (isset($cid)) {
-                    $other_text .= ' value="'. (!empty($data->$cid) ? stripslashes($data->$cid) : '') .'"';
-                }
-                $other_text .= ' /><br />';
-		$myEntries[]= '<td><div class="qn-type">'. $other_text.' </div></fieldset></td>';
-                break;
-		}
-
-
- return $myEntries;
-}
-?>
-

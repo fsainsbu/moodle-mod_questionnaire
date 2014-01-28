@@ -14,76 +14,190 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/// This page prints a particular instance of questionnaire
+require_once("../../config.php");
+require_once($CFG->libdir . '/completionlib.php');
+require_once($CFG->dirroot.'/mod/questionnaire/questionnaire.class.php');
 
-    require_once("../../config.php");
-    require_once("lib.php");
-    require_once($CFG->libdir . '/completionlib.php');
+if (!isset($SESSION->questionnaire)) {
+    $SESSION->questionnaire = new stdClass();
+}
+$SESSION->questionnaire->current_tab = 'view';
 
-    if (!isset($SESSION->questionnaire)) {
-        $SESSION->questionnaire = new stdClass();
+$id = optional_param('id', null, PARAM_INT);    // Course Module ID.
+$a = optional_param('a', null, PARAM_INT);      // Or questionnaire ID.
+
+$sid = optional_param('sid', null, PARAM_INT);  // Survey id.
+
+if ($id) {
+    if (! $cm = get_coursemodule_from_id('questionnaire', $id)) {
+        print_error('invalidcoursemodule');
     }
-    $SESSION->questionnaire->current_tab = 'view';
 
-    $id = optional_param('id', NULL, PARAM_INT);    // Course Module ID, or
-    $a = optional_param('a', NULL, PARAM_INT);      // questionnaire ID
+    if (! $course = $DB->get_record("course", array("id" => $cm->course))) {
+        print_error('coursemisconf');
+    }
 
-    $sid = optional_param('sid', NULL, PARAM_INT);  // Survey id.
+    if (! $questionnaire = $DB->get_record("questionnaire", array("id" => $cm->instance))) {
+        print_error('invalidcoursemodule');
+    }
 
-    if ($id) {
-        if (! $cm = get_coursemodule_from_id('questionnaire', $id)) {
-            print_error('invalidcoursemodule');
-        }
+} else {
+    if (! $questionnaire = $DB->get_record("questionnaire", array("id" => $a))) {
+        print_error('invalidcoursemodule');
+    }
+    if (! $course = $DB->get_record("course", array("id" => $questionnaire->course))) {
+        print_error('coursemisconf');
+    }
+    if (! $cm = get_coursemodule_from_instance("questionnaire", $questionnaire->id, $course->id)) {
+        print_error('invalidcoursemodule');
+    }
+}
 
-        if (! $course = $DB->get_record("course", array("id" => $cm->course))) {
-            print_error('coursemisconf');
-        }
+// Check login and get context.
+require_course_login($course, true, $cm);
+$context = context_module::instance($cm->id);
 
-        if (! $questionnaire = $DB->get_record("questionnaire", array("id" => $cm->instance))) {
-            print_error('invalidcoursemodule');
-        }
+$url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/view.php');
+if (isset($id)) {
+    $url->param('id', $id);
+} else {
+    $url->param('a', $a);
+}
+if (isset($sid)) {
+    $url->param('sid', $sid);
+}
 
+$PAGE->set_url($url);
+$PAGE->set_context($context);
+$questionnaire = new questionnaire(0, $questionnaire, $course, $cm);
+
+$PAGE->set_title(format_string($questionnaire->name));
+
+$PAGE->set_heading(format_string($course->fullname));
+
+echo $OUTPUT->header();
+
+echo $OUTPUT->heading(format_text($questionnaire->name));
+
+// Print the main part of the page.
+echo $OUTPUT->box_start('generalbox boxaligncenter boxwidthwide');
+if ($questionnaire->intro) {
+    echo $questionnaire->intro;
+}
+
+if (!$questionnaire->is_active()) {
+    echo '<div class="message">'
+    .get_string('notavail', 'questionnaire')
+    .'</div>';
+} else if (!$questionnaire->is_open()) {
+    echo '<div class="message">'
+    .get_string('notopen', 'questionnaire', userdate($questionnaire->opendate))
+    .'</div>';
+} else if ($questionnaire->is_closed()) {
+    echo '<div class="message">'
+    .get_string('closed', 'questionnaire', userdate($questionnaire->closedate))
+    .'</div>';
+} else if ($questionnaire->survey->realm == 'template') {
+    print_string('templatenotviewable', 'questionnaire');
+    echo $OUTPUT->box_end();
+    echo $OUTPUT->footer($questionnaire->course);
+    exit();
+} else if (!$questionnaire->user_is_eligible($USER->id)) {
+    if ($questionnaire->questions) {
+        echo '<div class="message">'.get_string('noteligible', 'questionnaire').'</div>';
+    }
+} else if (!$questionnaire->user_can_take($USER->id)) {
+    switch ($questionnaire->qtype) {
+        case QUESTIONNAIREDAILY:
+            $msgstring = ' '.get_string('today', 'questionnaire');
+            break;
+        case QUESTIONNAIREWEEKLY:
+            $msgstring = ' '.get_string('thisweek', 'questionnaire');
+            break;
+        case QUESTIONNAIREMONTHLY:
+            $msgstring = ' '.get_string('thismonth', 'questionnaire');
+            break;
+        default:
+            $msgstring = '';
+            break;
+    }
+    echo ('<div class="message">'.get_string("alreadyfilled", "questionnaire", $msgstring).'</div>');
+} else if ($questionnaire->user_can_take($USER->id)) {
+    $select = 'survey_id = '.$questionnaire->survey->id.' AND username = \''.$USER->id.'\' AND complete = \'n\'';
+    $resume = $DB->get_record_select('questionnaire_response', $select, null) !== false;
+    if (!$resume) {
+        $complete = get_string('answerquestions', 'questionnaire');
     } else {
-        if (! $questionnaire = $DB->get_record("questionnaire", array("id" => $a))) {
-            print_error('invalidcoursemodule');
-        }
-        if (! $course = $DB->get_record("course", array("id" => $questionnaire->course))) {
-            print_error('coursemisconf');
-        }
-        if (! $cm = get_coursemodule_from_instance("questionnaire", $questionnaire->id, $course->id)) {
-            print_error('invalidcoursemodule');
-        }
+        $complete = get_string('resumesurvey', 'questionnaire');
     }
-
-/// Check login and get context.
-    require_course_login($course, true, $cm);
-    $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-    require_capability('mod/questionnaire:view', $context);
-
-    $url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/view.php');
-    if (isset($id)) {
-        $url->param('id', $id);
-    } else {
-        $url->param('a', $a);
+    if ($questionnaire->questions) { // Sanity check.
+        echo '<a href="'.$CFG->wwwroot.htmlspecialchars('/mod/questionnaire/complete.php?'.
+        'id='.$questionnaire->cm->id).'">'.$complete.'</a>';
     }
-    if (isset($sid)) {
-        $url->param('sid', $sid);
-    }
+}
+if (!$questionnaire->questions) {
+    echo '<p>'.get_string('noneinuse', 'questionnaire').'</p>';
+}
+if ($questionnaire->capabilities->editquestions && !$questionnaire->questions) { // Sanity check.
+    echo '<a href="'.$CFG->wwwroot.htmlspecialchars('/mod/questionnaire/questions.php?'.
+                'id='.$questionnaire->cm->id).'">'.'<strong>'.get_string('addquestions', 'questionnaire').'</strong></a>';
+}
+echo $OUTPUT->box_end();
+if (isguestuser()) {
+    $output = '';
+    $guestno = html_writer::tag('p', get_string('guestsno', 'questionnaire'));
+    $liketologin = html_writer::tag('p', get_string('liketologin'));
+    $output .= $OUTPUT->confirm($guestno."\n\n".$liketologin."\n", get_login_url(),
+            get_referer(false));
+    echo $output;
+}
 
-    $PAGE->set_url($url);
-    $PAGE->set_context($context);
+$usernumresp = $questionnaire->count_submissions($USER->id);
 
-	add_to_log($course->id, "questionnaire", "view", "view.php?id=$cm->id", "$questionnaire->name", $cm->id, $USER->id);
+if ($questionnaire->capabilities->readownresponses && ($usernumresp > 0)) {
+    echo $OUTPUT->box_start('generalbox boxaligncenter boxwidthwide');
+    $argstr = 'instance='.$questionnaire->id.'&user='.$USER->id;
+    echo '<a href="'.$CFG->wwwroot.htmlspecialchars('/mod/questionnaire/myreport.php?'.
+        $argstr).'">'.get_string('viewyourresponses', 'questionnaire', $usernumresp).'</a>';
+    echo $OUTPUT->box_end();
+}
 
-/// Print the page header
+if ($survey = $DB->get_record('questionnaire_survey', array('id' => $questionnaire->sid))) {
+    $owner = (trim($survey->owner) == trim($course->id));
+} else {
+    $survey = false;
+    $owner = true;
+}
+$numresp = $questionnaire->count_submissions();
 
-    $questionnaire = new questionnaire(0, $questionnaire, $course, $cm);
-    $questionnaire->strquestionnaires = get_string("modulenameplural", "questionnaire");
-    $questionnaire->strquestionnaire  = get_string("modulename", "questionnaire");
+// Number of Responses in currently selected group (or all participants etc.).
+if (isset($SESSION->questionnaire->numselectedresps)) {
+    $numselectedresps = $SESSION->questionnaire->numselectedresps;
+} else {
+    $numselectedresps = $numresp;
+}
 
+// If questionnaire is set to separate groups, prevent user who is not member of any group
+// to view All responses.
+$canviewgroups = true;
+$groupmode = groups_get_activity_groupmode($cm, $course);
+if ($groupmode == 1) {
+    $canviewgroups = groups_has_membership($cm, $USER->id);;
+}
 
-    /// Mark as viewed
-	$completion=new completion_info($course);
-	$completion->set_module_viewed($cm);
-    $questionnaire->view();
-?>
+if ( ($questionnaire->capabilities->readallresponseanytime && $numresp > 0 && $owner && $numselectedresps > 0) ||
+        $questionnaire->capabilities->readallresponses && ($numresp > 0) && $canviewgroups &&
+           ($questionnaire->resp_view == QUESTIONNAIRE_STUDENTVIEWRESPONSES_ALWAYS ||
+            ($questionnaire->resp_view == QUESTIONNAIRE_STUDENTVIEWRESPONSES_WHENCLOSED
+                && $questionnaire->is_closed()) ||
+            ($questionnaire->resp_view == QUESTIONNAIRE_STUDENTVIEWRESPONSES_WHENANSWERED
+                && $usernumresp > 0)) &&
+           $questionnaire->is_survey_owner()) {
+    echo $OUTPUT->box_start('generalbox boxaligncenter boxwidthwide');
+    $argstr = 'instance='.$questionnaire->id;
+    echo '<a href="'.$CFG->wwwroot.htmlspecialchars('/mod/questionnaire/report.php?'.
+            $argstr).'">'.get_string('viewresponses', 'questionnaire', $numresp).'</a>';
+    echo $OUTPUT->box_end();
+}
+
+echo $OUTPUT->footer();
