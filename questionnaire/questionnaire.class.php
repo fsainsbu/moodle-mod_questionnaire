@@ -1401,6 +1401,14 @@ class questionnaire {
         }
 
         /* delete values */
+       //FPS need to delet associated  data_records  and data_content based on 
+/*        if ($contents = $DB->get_records('questionnaire_resp_data', array('response_id' => $rid))) {
+                        foreach ($contents as $content) {  // Delete files or whatever else this field allows
+     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
+     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+                            }
+                        }
+*/
         $select = 'response_id = \''.$rid.'\' '.$qids;
         foreach (array('response_bool', 'resp_single', 'resp_multiple', 'response_rank', 'response_text',
                        'response_other', 'response_date' ,'resp_data') as $tbl) {
@@ -1584,6 +1592,7 @@ class questionnaire {
                         print_r($qpos);
                         print_r($qname);
                         print_r($val);
+                        print_r("here\n");
                 }
         //  FPS not used yet    
             $val = $qchoice;

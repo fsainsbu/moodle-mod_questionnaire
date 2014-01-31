@@ -401,7 +401,15 @@ function questionnaire_delete_response($rid) {
     $DB->delete_records('questionnaire_response_rank', array('response_id' => $rid));
     $DB->delete_records('questionnaire_resp_single', array('response_id' => $rid));
     $DB->delete_records('questionnaire_response_text', array('response_id' => $rid));
-    // FPS how to delete data from responses?
+    // FPS how to delete data from responses?  get all choice_id  from questionnaire_resp_data 
+    // delete   matchin data_records and data_content
+    if ($contents = $DB->get_records('questionnaire_resp_data', array('response_id' => $rid))) {
+                        foreach ($contents as $content) {  // Delete files or whatever else this field allows
+     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
+     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+                            }
+                        }
+
     $DB->delete_records('questionnaire_resp_data', array('response_id' => $rid));
 
     $status = $status && $DB->delete_records('questionnaire_response', array('id' => $rid));
@@ -423,7 +431,14 @@ function questionnaire_delete_responses($qid) {
     $DB->delete_records('questionnaire_response_rank', array('question_id' => $qid));
     $DB->delete_records('questionnaire_resp_single', array('question_id' => $qid));
     $DB->delete_records('questionnaire_response_text', array('question_id' => $qid));
-    // FPS how to delete data from responses?
+    // FPS how to delete data from responses?  get all choice_id  from questionnaire_resp_data 
+    // delete   matchin data_records and data_content
+    if ($contents = $DB->get_records('questionnaire_resp_data', array('question_id' => $qid))) {
+                        foreach ($contents as $content) {  // Delete files or whatever else this field allows
+     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
+     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+                            }
+                          }
     $DB->delete_records('questionnaire_resp_data', array('question_id' => $qid));
 
     $status = $status && $DB->delete_records('questionnaire_response', array('id' => $qid));

@@ -448,8 +448,11 @@ foreach ($results as $nkey => $nresult) {
 
 /* match key in name qt140-4-1  and insert result n record i  array[4,i]= value*/
         $val = optional_param('q'. $suf.$this->id.'-'. $nresult->id.'-'.$i, null, PARAM_CLEAN);
-         print_r($val);
+         /*
+print_r($val);
         print_r( ' q'. $suf.$this->id.'-'. $nresult->id.'-'.$i.' : ');
+*/
+
  if (isset($val) && $val != '' ) {
      if($isfirst) {
                 $isfirst = false;
@@ -715,7 +718,7 @@ private function dbase_survey_display($formdata='') { // Database
         	{
 		 $object[]=$answer;
 		}
-		print $formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i};
+	//	print $formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i};
                 $myMenu .= html_writer::select($object, 'qs'.$this->id.'-'.$result->id.'-'.$i, (isset($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i})?$i:''), array(''=>'choosedots'), array('id' => $this->type . $this->id));
 			$myEntries[$i][] = "<td>".$myMenu."</td>";
                 break;
