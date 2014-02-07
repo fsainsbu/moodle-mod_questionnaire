@@ -405,8 +405,8 @@ function questionnaire_delete_response($rid) {
     // delete   matchin data_records and data_content
     if ($contents = $DB->get_records('questionnaire_resp_data', array('response_id' => $rid))) {
                         foreach ($contents as $content) {  // Delete files or whatever else this field allows
-     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
-     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+     $DB->delete_records('data_content', array('recordid'=>$content->choice_id));
+     $DB->delete_records('data_records', array('id'=>$content->choice_id));
                             }
                         }
 
@@ -435,8 +435,8 @@ function questionnaire_delete_responses($qid) {
     // delete   matchin data_records and data_content
     if ($contents = $DB->get_records('questionnaire_resp_data', array('question_id' => $qid))) {
                         foreach ($contents as $content) {  // Delete files or whatever else this field allows
-     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
-     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+     $DB->delete_records('data_content', array('recordid'=>$content->choice_id));
+     $DB->delete_records('data_records', array('id'=>$content->choice_id));
                             }
                           }
     $DB->delete_records('questionnaire_resp_data', array('question_id' => $qid));

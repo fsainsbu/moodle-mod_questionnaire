@@ -1400,16 +1400,16 @@ class questionnaire {
             $qids = '';
         }
 
+        $select = 'response_id = \''.$rid.'\' '.$qids;
         /* delete values */
        //FPS need to delet associated  data_records  and data_content based on 
-/*        if ($contents = $DB->get_records('questionnaire_resp_data', array('response_id' => $rid))) {
+        if ($contents = $DB->get_records('questionnaire_resp_data', array('response_id' => $rid))) {
                         foreach ($contents as $content) {  // Delete files or whatever else this field allows
-     $DB->delete_records('data_content', array('recordid'=>$content->choiceid));
-     $DB->delete_records('data_records', array('id'=>$content->choiceid));
+     $DB->delete_records('data_content', array('recordid'=>$content->choice_id));
+     $DB->delete_records('data_records', array('id'=>$content->choice_id));
                             }
                         }
-*/
-        $select = 'response_id = \''.$rid.'\' '.$qids;
+
         foreach (array('response_bool', 'resp_single', 'resp_multiple', 'response_rank', 'response_text',
                        'response_other', 'response_date' ,'resp_data') as $tbl) {
             $DB->delete_records_select('questionnaire_'.$tbl, $select);

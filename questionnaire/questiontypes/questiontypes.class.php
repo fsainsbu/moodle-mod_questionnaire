@@ -426,7 +426,7 @@ class questionnaire_question {
 /*   FPS reverse engineer the keys for the parameters and voila add to data data_records and data content */
 $results = $DB->get_records('data_fields', array('dataid'=>$this->precise) , '', 'name, id, type,description,param1');
 // need to check max of $this->length and -$i value
-for ($i = 1; $i < $this->length; $i++) {
+for ($i = 1; $i <= $this->length; $i++) {
                 $isfirst = true;
 foreach ($results as $nkey => $nresult) {
          //print_r($nresult);
@@ -486,13 +486,13 @@ print_r($val);
                 $myresult =  clean_param($val, PARAM_NOTAGS);
      /* the thing has options in a list checkbox, menu in data*/
             if ($nresult->param1){
-                        $myc=1;
+                        $myc=0;
                         foreach (explode("\n",$nresult->param1 ) as $myanswer) {
                         if (is_array($myresult)) {
                         if (in_array($myc,$myresult)) {
                                 if ($mycatch) $mycatch .= '##'.$myanswer; else  $mycatch = $myanswer;
                         }
-                        } else if  ( $myc   == ($myresult + 1) && is_numeric($myresult ) )  $mycatch = $myanswer;
+                        } else if  ( $myc   == ($myresult ) && is_numeric($myresult ) )  $mycatch = $myanswer;
                         $myc++;
                         }
 
@@ -511,7 +511,7 @@ print_r($val);
                 } else {
                         $DB->insert_record('data_content', $content);
                 }
-}
+             }
 }
 }
 return $resid;
@@ -714,12 +714,27 @@ private function dbase_survey_display($formdata='') { // Database
             switch ($result->type) {
             case 'menu' :
 		$myMenu='';
+                $mycnt=0;
+                $selected='';
 		 foreach (explode("\n",$result->param1 ) as $answer)
         	{
 		 $object[]=$answer;
+                if($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i} === $answer )
+                {
+                $selected=$mycnt;
+		/*
+                print_r( $formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i});
+                print_r(" : ");
+                print_r($answer);
+                print_r("<br>");
+                */
 		}
-	//	print $formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i};
-                $myMenu .= html_writer::select($object, 'qs'.$this->id.'-'.$result->id.'-'.$i, (isset($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i})?$i:''), array(''=>'choosedots'), array('id' => $this->type . $this->id));
+                $mycnt++;
+		}
+		//print_r( isset($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i}));
+ //FPS save is ok, recover is ok, this is not...
+                //$myMenu .= html_writer::select($object, 'qs'.$this->id.'-'.$result->id.'-'.$i, (isset($formdata->{'qs'.$this->id.'-'.$result->id.'-'.$i})?$i:''), array(''=>'choosedots'), array('id' => $this->type . $this->id));
+                $myMenu .= html_writer::select($object, 'qs'.$this->id.'-'.$result->id.'-'.$i,$selected , array(''=>'choosedots'), array('id' => $this->type . $this->id));
 			$myEntries[$i][] = "<td>".$myMenu."</td>";
                 break;
             case 'checkbox':
@@ -2012,7 +2027,7 @@ if (isset( $formdata->{'qc'.$this->id.'-'.$result->id.'-'.$i})) {
         /* FPS single record  this is odd */
         // print_r($data);
         if (isset($data->{'q'.$this->id})) {
-            echo '<div class="response date">';
+            echo '<div class="response data">';
             echo('<span class="selected">'.$data->{'q'.$this->id}.'</span>');
             echo '</div>';
         }
