@@ -409,19 +409,17 @@ class questionnaire_question {
         global $DB;
         global $CFG;
         global $USER;
-        global $course;
+        global $context;
         global $SESSION;
 	$answer = array();
 	$mydata = array();
 	/* FPS  Multiple fields to be  inserted/ updated in the database for user .   
 	At this stage a record should exist for the question with id of user in it.
 	*/
-	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
-                $currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
-        } else {
- 	$currentgroupid = 1;
-            $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
-	}
+        $cm = get_coursemodule_from_id('questionnaire', $context->instanceid, 0, false, MUST_EXIST); 
+        // Get the current group id.
+        $currentgroupid = groups_get_activity_group($cm);
+        $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
 
 /*   FPS reverse engineer the keys for the parameters and voila add to data data_records and data content */
 $results = $DB->get_records('data_fields', array('dataid'=>$this->precise) , '', 'name, id, type,description,param1');
@@ -599,6 +597,7 @@ return $resid;
         global $CFG;
         global $DB;
         global $SESSION;
+        global $context;
 
         $ridstr = '';
         if (is_array($rids)) {
@@ -609,15 +608,13 @@ return $resid;
         } else if (is_int($rids)) {
             $ridstr = ' AND response_id = '.$rids.' ';
         }
-     // $currentgroupid = groups_get_activity_group($cm);
-     $currentgroupid = 1;
 //FPS engine here selects all group entries on this questionaire selects all group entries on this questionnaire
-	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
-        	$currentsessiongroupid = $SESSION->questionnaire->currentgroupid;
-	} else {
-	    $currentgroupid =  1;
-            $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
-	}
+        // Get the current group id.
+        $cm = get_coursemodule_from_id('questionnaire', $context->instanceid, 0, false, MUST_EXIST); 
+        // Get the current group id.
+        $currentgroupid = groups_get_activity_group($cm);
+        $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
+
        $sql = 'SELECT id,  choice_id as response '.
                'FROM {questionnaire_'.$this->response_table.'} '.
                'WHERE question_id= ? '.$ridstr;
@@ -666,7 +663,7 @@ function display_resp_data_results($rids=false) {
 
 
 //the analysis of frequency done here is placeholder for hack above for graphing hasontable etc.
-         $this->mkreslistdata(count($rids), $this->precise, $prtotal);
+         // FPS secon listing not pretty  $this->mkreslistdata(count($rids), $this->precise, $prtotal);
 
         return $rows;
 	}
@@ -676,15 +673,17 @@ private function dbase_survey_display($formdata='') { // Database
         global $DB;
         global $SESSION;
         global $USER;
+        global $context;
 	$myEntries = array();
  	$myHeader = array();
 
-	if (isset($SESSION->questionnaire->currentgroupid)) { // needed for add, view by resp and delete all
-                $currentgroupid = $SESSION->questionnaire->currentgroupid;
-	} else {
-	    $currentgroupid =  1;
-            $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
-	}
+        // Get the current group id.
+        //  print_info($CM);
+        $cm = get_coursemodule_from_id('questionnaire', $context->instanceid, 0, false, MUST_EXIST); 
+        // Get the current group id.
+        $currentgroupid = groups_get_activity_group($cm);
+        $SESSION->questionnaire->currentsessiongroupid = $currentgroupid;
+        // print_r($currentgroupid.'&nbsp');
         /*print_r($formdata);
         print_r('here<br>'.$this->rid);
         foreach ($formdata as $key => $result) {
